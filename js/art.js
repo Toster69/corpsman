@@ -1,160 +1,209 @@
-/* Заглушки: рисованные силуэты персонажей и процедурные фоны.
-   Они используются, только пока в data/*.json не указан путь к вашему PNG/JPG. */
+/* Заглушки в стиле Corpsman: плоские двухтоновые фигуры со стикерным контуром
+   и фоны, пропущенные через CMYK-постеризацию. Используются, только пока
+   в data/*.json не указан путь к вашей картинке. */
 (function () {
   const cache = {};
+  const PAPER = '#efece2';
 
-  // ---------- Спрайты-силуэты (SVG) ----------
-  function sprite(ch, expr) {
-    const key = ch.id + ':' + (expr || 'default');
-    if (cache[key]) return cache[key];
-    const L = Object.assign({ hair: '#333', skin: '#eed', cloth: '#456', accent: '#ccc', hairStyle: 'short' }, ch.look || {});
+  function hex(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map((x) => x + x).join(''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); }
+  function mix(a, b, t) { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
+
+  // ---------- Спрайты ----------
+  function sprite(ch, expr, opt) {
+    opt = opt || {};
     const e = expr || 'default';
-    const brow = e === 'worried' || e === 'scared' ? 'M150 228 Q170 218 186 226 M214 226 Q230 218 250 228' : 'M150 226 Q168 220 186 224 M214 224 Q232 220 250 226';
-    const mouth = e === 'smile' ? 'M178 318 Q200 336 222 318' : e === 'scared' ? 'M188 322 Q200 312 212 322 Q200 334 188 322' : 'M182 322 Q200 326 218 322';
-    const eyeR = e === 'scared' ? 9 : 7;
+    const key = ch.id + ':' + e + (opt.blink ? ':b' : '');
+    if (cache[key]) return cache[key];
+    const L = Object.assign({ hair: '#222', hairStyle: 'short' }, ch.look || {});
+    const main = ch.color || '#22b8cf';
+    if (ch.id === 'narrator' || L.style === 'mirror') return (cache[key] = mirrorFigure(opt.blink));
+
+    const id = key.replace(/[^a-z0-9]/gi, '');
+    const skin = mix(main, PAPER, 0.45);
+    const hair = mix(L.hair, '#0b0b0d', 0.35);
+    const brow = e === 'worried' || e === 'scared' ? 'M150 228 Q170 216 186 226 M214 226 Q230 216 250 228' : 'M150 226 Q168 220 186 224 M214 224 Q232 220 250 226';
+    const mouth = e === 'smile' ? 'M178 318 Q200 338 222 318' : e === 'scared' ? 'M188 322 Q200 310 212 322 Q200 336 188 322' : 'M182 322 Q200 327 218 322';
+    const er = e === 'scared' ? 9 : 7;
+    const eyes = opt.blink
+      ? '<path d="M158 258 L178 258 M222 258 L242 258" stroke="#0b0b0d" stroke-width="6" stroke-linecap="round"/>'
+      : `<ellipse cx="168" cy="256" rx="${er}" ry="${er + 1}" fill="#0b0b0d"/><ellipse cx="232" cy="256" rx="${er}" ry="${er + 1}" fill="#0b0b0d"/>`;
     let hairBack = '', hairFront = '';
     if (L.hairStyle === 'long') {
-      hairBack = `<path d="M108 250 Q100 140 200 132 Q300 140 292 250 L306 470 Q250 500 200 470 Q150 500 94 470 Z" fill="${L.hair}"/>`;
-      hairFront = `<path d="M116 248 Q118 150 200 146 Q284 150 286 246 Q262 196 236 186 Q200 214 150 200 Q128 214 116 248 Z" fill="${L.hair}"/>`;
+      hairBack = `<path d="M108 250 Q100 140 200 132 Q300 140 292 250 L306 470 Q250 500 200 470 Q150 500 94 470 Z" fill="${hair}"/>`;
+      hairFront = `<path d="M116 248 Q118 150 200 146 Q284 150 286 246 Q262 196 236 186 Q200 214 150 200 Q128 214 116 248 Z" fill="${hair}"/>`;
     } else if (L.hairStyle === 'old') {
-      hairFront = `<path d="M118 236 Q116 158 200 152 Q284 158 282 236 Q270 196 246 188 Q200 176 154 188 Q130 196 118 236 Z" fill="${L.hair}"/>`;
+      hairFront = `<path d="M118 236 Q116 158 200 152 Q284 158 282 236 Q270 196 246 188 Q200 176 154 188 Q130 196 118 236 Z" fill="${mix(L.hair, PAPER, 0.2)}"/>`;
     } else {
-      hairBack = `<path d="M114 262 Q104 146 200 136 Q296 146 286 262 L280 300 L120 300 Z" fill="${L.hair}"/>`;
-      hairFront = `<path d="M114 250 Q112 150 200 144 Q288 150 286 250 Q276 200 250 182 Q220 210 168 196 Q132 206 114 250 Z" fill="${L.hair}"/>`;
+      hairBack = `<path d="M114 262 Q104 146 200 136 Q296 146 286 262 L280 300 L120 300 Z" fill="${hair}"/>`;
+      hairFront = `<path d="M114 250 Q112 150 200 144 Q288 150 286 250 Q276 200 250 182 Q220 210 168 196 Q132 206 114 250 Z" fill="${hair}"/>`;
     }
-    const tall = L.hairStyle === 'old' ? -30 : 0;
+    const lift = L.hairStyle === 'old' ? -30 : 0;
+    const fig = `${hairBack}
+      <path d="M40 900 L52 640 Q60 520 150 488 L176 470 L224 470 L250 488 Q340 520 348 640 L360 900 Z" fill="${main}"/>
+      <path d="M176 470 L200 570 L224 470 Z" fill="#0b0b0d"/>
+      <rect x="176" y="380" width="48" height="96" rx="20" fill="${skin}"/>
+      <ellipse cx="200" cy="262" rx="88" ry="104" fill="${skin}"/>
+      ${hairFront}`;
+    const smoke = e === 'smoke' ? '<rect x="222" y="318" width="46" height="8" rx="3" fill="#efece2"/><circle cx="270" cy="322" r="5" fill="#e8452c"/><path d="M274 312 Q294 280 272 250 Q256 220 284 190" stroke="#efece2" stroke-width="7" fill="none" opacity=".55"/>' : '';
     const body = `
-      <g transform="translate(0 ${tall})">
-      ${hairBack}
-      <path d="M40 900 L52 640 Q60 520 150 488 L176 470 L224 470 L250 488 Q340 520 348 640 L360 900 Z" fill="${L.cloth}"/>
-      <path d="M176 470 L200 560 L224 470 Z" fill="${L.accent}" opacity=".85"/>
-      <rect x="176" y="380" width="48" height="96" rx="20" fill="${L.skin}"/>
-      <ellipse cx="200" cy="262" rx="88" ry="104" fill="${L.skin}"/>
-      ${hairFront}
-      <path d="${brow}" stroke="#2a2420" stroke-width="5" fill="none" stroke-linecap="round" opacity=".7"/>
-      <circle cx="168" cy="256" r="${eyeR}" fill="#1e2a26"/><circle cx="232" cy="256" r="${eyeR}" fill="#1e2a26"/>
-      <path d="${mouth}" stroke="#7a3b32" stroke-width="5" fill="${e === 'scared' ? '#5a2a26' : 'none'}" stroke-linecap="round"/>
-      ${e === 'smoke' ? '<rect x="222" y="318" width="44" height="7" rx="3" fill="#eee"/><circle cx="268" cy="321" r="4" fill="#e8834a"/><path d="M272 312 Q290 280 270 250 Q256 220 282 190" stroke="#cfd8d4" stroke-width="6" fill="none" opacity=".5"/>' : ''}
+      <g transform="translate(0 ${lift})">
+        ${fig}
+        <g clip-path="url(#c${id})" opacity=".86">${fig.replace(/fill="[^"]+"/g, 'fill="#0b0b0d"')}</g>
+        <path d="M120 600 Q150 700 130 900" stroke="#0b0b0d" stroke-width="7" fill="none" opacity=".7"/>
+        <path d="${brow}" stroke="#0b0b0d" stroke-width="6" fill="none" stroke-linecap="round"/>
+        ${eyes}
+        <path d="${mouth}" stroke="#0b0b0d" stroke-width="6" fill="${e === 'scared' ? '#0b0b0d' : 'none'}" stroke-linecap="round"/>
+        ${smoke}
       </g>`;
     let inner = body;
-    if (e === 'glitch') {
-      inner = `<g opacity=".55" transform="translate(-14 0)" style="mix-blend-mode:screen">${body}</g><g opacity=".55" transform="translate(14 6)">${body}</g>${body}`;
-    }
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 900">${inner}</svg>`;
+    if (e === 'glitch') inner = `<g opacity=".55" transform="translate(-18 0)">${body}</g><g opacity=".55" transform="translate(18 6)">${body}</g>${body}`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 900"><defs><clipPath id="c${id}"><path d="M232 0 L400 0 L400 900 L262 900 L284 700 L240 560 L264 420 L230 330 L266 210 L240 120 Z"/></clipPath></defs>${inner}</svg>`;
     return (cache[key] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
   }
 
-  // ---------- Процедурные фоны (canvas) ----------
+  // Зеркальный человек: чёрная фигура, белый нервный контур, голова-пламя
+  function mirrorFigure(blink) {
+    const s = (d, w) => `<path d="${d}" fill="none" stroke="#f4fbff" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const o = 'M170 300 Q150 250 168 210 Q160 160 186 120 Q190 160 200 150 Q206 100 222 70 Q226 130 240 140 Q252 180 236 220 Q256 260 232 300 Q236 330 214 340 L216 380 Q300 400 318 470 L330 700 Q330 720 314 718 L300 560 L290 900 L230 900 L206 680 L190 900 L130 900 L112 560 L94 720 Q78 720 80 700 L92 470 Q110 400 186 380 L186 340 Q166 330 170 300 Z';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 900"><path d="${o}" fill="#0b0b0d"/>${s(o, 7)}<g transform="translate(5 -4)" opacity=".45">${s(o, 3)}</g>${blink ? '' : '<path d="M184 262 Q196 252 202 268 Q192 276 184 262 Z M214 262 Q224 254 232 266 Q222 274 214 262 Z" fill="#f4fbff"/>'}</svg>`;
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  }
+
+  // ---------- Фоны ----------
   function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
-  function hash(str) { let h = 2166136261; for (const c of str) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h; }
+  function hash(str) { let h = 2166136261; for (const c of String(str)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 
   function trees(g, r, n, yBase, hMin, hMax, color, W) {
     g.fillStyle = color;
     for (let i = 0; i < n; i++) {
       const x = r() * W, h = hMin + r() * (hMax - hMin), w = h * (0.16 + r() * 0.08);
-      g.beginPath();
-      g.moveTo(x, yBase - h);
-      for (let k = 1; k <= 6; k++) {
-        const yy = yBase - h + (h * k) / 6.4, ww = (w * k) / 6;
-        g.lineTo(x + ww, yy); g.lineTo(x + ww * 0.45, yy);
-      }
-      for (let k = 6; k >= 1; k--) {
-        const yy = yBase - h + (h * k) / 6.4, ww = (w * k) / 6;
-        g.lineTo(x - ww * 0.45, yy); g.lineTo(x - ww, yy);
-      }
-      g.closePath(); g.fill();
-      g.fillRect(x - w * 0.05, yBase - h * 0.08, w * 0.1, h * 0.1);
+      g.beginPath(); g.moveTo(x, yBase - h);
+      for (let k = 1; k <= 6; k++) { const yy = yBase - h + (h * k) / 6.4, ww = (w * k) / 6; g.lineTo(x + ww, yy); g.lineTo(x + ww * 0.45, yy); }
+      for (let k = 6; k >= 1; k--) { const yy = yBase - h + (h * k) / 6.4, ww = (w * k) / 6; g.lineTo(x - ww * 0.45, yy); g.lineTo(x - ww, yy); }
+      g.closePath(); g.fill(); g.fillRect(x - w * 0.05, yBase - h * 0.08, w * 0.1, h * 0.1);
     }
   }
   function grad(g, W, H, stops) { const gr = g.createLinearGradient(0, 0, 0, H); stops.forEach(([o, c]) => gr.addColorStop(o, c)); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
-  function fog(g, W, H, y, color) { const gr = g.createLinearGradient(0, y - 140, 0, y + 80); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.6, color); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, y - 140, W, 220); }
-  function leaves(g, r, n, W, H, colors) { for (let i = 0; i < n; i++) { g.fillStyle = colors[(r() * colors.length) | 0]; g.save(); g.translate(r() * W, r() * H); g.rotate(r() * 6); g.beginPath(); g.ellipse(0, 0, 7, 3.5, 0, 0, 6.3); g.fill(); g.restore(); } }
+  function glow(g, x, y, r0, r1, c) { const gr = g.createRadialGradient(x, y, r0, x, y, r1); gr.addColorStop(0, c); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 1600, 900); }
+  function leaves(g, r, n, W, H) { for (let i = 0; i < n; i++) { g.fillStyle = r() > 0.5 ? '#ddd' : '#999'; g.save(); g.translate(r() * W, r() * H); g.rotate(r() * 6); g.beginPath(); g.ellipse(0, 0, 8, 4, 0, 0, 6.3); g.fill(); g.restore(); } }
+  function moon(g, x, y, R) { g.fillStyle = '#f6f6f6'; g.beginPath(); g.arc(x, y, R, 0, 7); g.fill(); g.fillStyle = '#b0b0b0'; [[-0.3, -0.2, 0.22], [0.25, 0.1, 0.16], [-0.05, 0.35, 0.12]].forEach(([a, b, c]) => { g.beginPath(); g.arc(x + a * R, y + b * R, c * R, 0, 7); g.fill(); }); }
 
   const presets = {
     town(g, W, H, r) {
-      grad(g, W, H, [[0, '#2b3b4a'], [0.45, '#c8735a'], [0.62, '#e9a76b'], [1, '#2a2620']]);
-      g.fillStyle = 'rgba(255,214,150,.9)'; g.beginPath(); g.arc(W * 0.7, H * 0.55, 60, 0, 7); g.fill();
-      trees(g, r, 70, H * 0.72, 120, 260, '#3b3a3a', W);
-      g.fillStyle = '#231f1d';
-      for (let i = 0; i < 14; i++) { const x = 80 + i * 110 + r() * 30, w = 70 + r() * 40, h = 50 + r() * 50; g.fillRect(x, H * 0.78 - h, w, h + 200); g.beginPath(); g.moveTo(x - 8, H * 0.78 - h); g.lineTo(x + w / 2, H * 0.78 - h - 40); g.lineTo(x + w + 8, H * 0.78 - h); g.fill(); g.fillStyle = 'rgba(255,190,110,.75)'; if (r() > 0.4) g.fillRect(x + 14, H * 0.78 - h + 16, 12, 14); g.fillStyle = '#231f1d'; }
-      trees(g, r, 30, H * 1.05, 260, 480, '#141413', W);
+      grad(g, W, H, [[0, '#111'], [0.5, '#777'], [0.62, '#ccc'], [1, '#222']]);
+      moon(g, W * 0.72, H * 0.24, 70);
+      trees(g, r, 70, H * 0.72, 120, 260, '#555', W);
+      for (let i = 0; i < 14; i++) { g.fillStyle = '#2a2a2a'; const x = 80 + i * 110 + r() * 30, w = 70 + r() * 40, h = 50 + r() * 50; g.fillRect(x, H * 0.78 - h, w, h + 200); g.beginPath(); g.moveTo(x - 8, H * 0.78 - h); g.lineTo(x + w / 2, H * 0.78 - h - 40); g.lineTo(x + w + 8, H * 0.78 - h); g.fill(); g.fillStyle = '#eee'; if (r() > 0.4) g.fillRect(x + 14, H * 0.78 - h + 16, 12, 14); }
+      trees(g, r, 30, H * 1.05, 260, 480, '#0e0e0e', W);
     },
     park(g, W, H, r) {
-      grad(g, W, H, [[0, '#d8b48a'], [0.5, '#b8784c'], [1, '#3a2a1e']]);
-      trees(g, r, 60, H * 0.7, 200, 380, '#7a5038', W); fog(g, W, H, H * 0.7, 'rgba(240,200,160,.45)');
-      trees(g, r, 40, H * 0.82, 300, 520, '#4f3524', W);
-      g.fillStyle = '#6e5442'; g.beginPath(); g.moveTo(W * 0.42, H * 0.7); g.lineTo(W * 0.58, H * 0.7); g.lineTo(W * 0.85, H); g.lineTo(W * 0.15, H); g.fill();
-      trees(g, r, 14, H * 1.02, 500, 820, '#231811', W);
-      leaves(g, r, 260, W, H, ['#e8834a', '#d9a441', '#c4582a', '#f0b25a']);
+      grad(g, W, H, [[0, '#ddd'], [0.55, '#888'], [1, '#222']]);
+      trees(g, r, 60, H * 0.7, 200, 380, '#777', W);
+      glow(g, W * 0.5, H * 0.66, 10, 520, 'rgba(255,255,255,.35)');
+      trees(g, r, 40, H * 0.82, 300, 520, '#444', W);
+      g.fillStyle = '#9a9a9a'; g.beginPath(); g.moveTo(W * 0.44, H * 0.7); g.lineTo(W * 0.56, H * 0.7); g.lineTo(W * 0.85, H); g.lineTo(W * 0.15, H); g.fill();
+      trees(g, r, 14, H * 1.02, 500, 820, '#141414', W);
+      leaves(g, r, 220, W, H);
     },
     gazebo(g, W, H, r) {
       presets.park(g, W, H, r);
       const cx = W * 0.62, base = H * 0.78;
-      g.fillStyle = '#efe6d8'; g.strokeStyle = '#3a2a1e'; g.lineWidth = 4;
+      g.fillStyle = '#f2f2f2'; g.strokeStyle = '#111'; g.lineWidth = 6;
       g.beginPath(); g.moveTo(cx - 260, base - 300); g.lineTo(cx, base - 430); g.lineTo(cx + 260, base - 300); g.closePath(); g.fill(); g.stroke();
-      g.fillStyle = '#d9cdb8';
+      g.fillStyle = '#d6d6d6';
       [-230, -80, 80, 230].forEach((dx) => g.fillRect(cx + dx - 10, base - 300, 20, 300));
       g.fillRect(cx - 250, base - 120, 500, 14); g.fillRect(cx - 270, base, 540, 26);
       for (let i = -240; i < 240; i += 26) g.fillRect(cx + i, base - 110, 6, 110);
-      leaves(g, r, 120, W, H, ['#e8834a', '#d9a441']);
     },
     studio(g, W, H, r) {
-      grad(g, W, H, [[0, '#3a2c22'], [1, '#1b1410']]);
+      grad(g, W, H, [[0, '#555'], [1, '#151515']]);
       for (let s = 0; s < 4; s++) {
         const y = 140 + s * 170;
-        g.fillStyle = '#5a4130'; g.fillRect(60, y + 120, W - 120, 16);
-        for (let x = 80; x < W - 140; ) {
+        g.fillStyle = '#333'; g.fillRect(60, y + 120, W - 120, 16);
+        for (let x = 80; x < W - 140;) {
           const w = 60 + r() * 70, h = 70 + r() * 45;
-          g.fillStyle = '#c9a46a'; g.fillRect(x, y + 120 - h, w, h);
-          g.fillStyle = s === 0 ? '#8a6a48' : r() > 0.5 ? '#7d7a72' : '#4a4a46'; g.fillRect(x + 7, y + 127 - h, w - 14, h - 14);
+          g.fillStyle = '#bbb'; g.fillRect(x, y + 120 - h, w, h);
+          g.fillStyle = r() > 0.5 ? '#777' : '#3c3c3c'; g.fillRect(x + 7, y + 127 - h, w - 14, h - 14);
           x += w + 18 + r() * 30;
         }
       }
-      const gr = g.createRadialGradient(W * 0.3, 0, 40, W * 0.3, 0, 900); gr.addColorStop(0, 'rgba(255,214,150,.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-      g.fillStyle = '#120d0a'; g.fillRect(0, H * 0.86, W, H);
+      glow(g, W * 0.3, 0, 40, 900, 'rgba(255,255,255,.35)');
+      g.fillStyle = '#0d0d0d'; g.fillRect(0, H * 0.86, W, H);
     },
     street(g, W, H, r) {
-      grad(g, W, H, [[0, '#0f1820'], [0.6, '#22303a'], [1, '#121618']]);
-      trees(g, r, 50, H * 0.7, 200, 380, '#16211f', W);
-      g.fillStyle = '#2a2a28'; g.fillRect(0, H * 0.78, W, H);
-      [0.2, 0.75].forEach((p) => {
-        const x = W * p; g.fillStyle = '#0c0d0d'; g.fillRect(x - 6, H * 0.3, 12, H * 0.5);
-        const gr = g.createRadialGradient(x, H * 0.3, 10, x, H * 0.4, 380); gr.addColorStop(0, 'rgba(255,214,140,.75)'); gr.addColorStop(1, 'rgba(255,214,140,0)'); g.fillStyle = gr; g.fillRect(x - 400, 0, 800, H);
-      });
-      g.fillStyle = '#3d2d22'; g.fillRect(W * 0.38, H * 0.72, W * 0.24, 18); g.fillRect(W * 0.39, H * 0.66, W * 0.22, 12); g.fillRect(W * 0.4, H * 0.72, 10, 70); g.fillRect(W * 0.6 - 10, H * 0.72, 10, 70);
+      grad(g, W, H, [[0, '#0d0d0d'], [0.6, '#3a3a3a'], [1, '#141414']]);
+      trees(g, r, 50, H * 0.7, 200, 380, '#262626', W);
+      g.fillStyle = '#4a4a4a'; g.fillRect(0, H * 0.78, W, H);
+      [0.2, 0.75].forEach((p) => { const x = W * p; g.fillStyle = '#0c0c0c'; g.fillRect(x - 6, H * 0.3, 12, H * 0.5); glow(g, x, H * 0.3, 10, 400, 'rgba(255,255,255,.75)'); });
+      g.fillStyle = '#1b1b1b'; g.fillRect(W * 0.38, H * 0.72, W * 0.24, 18); g.fillRect(W * 0.39, H * 0.66, W * 0.22, 12); g.fillRect(W * 0.4, H * 0.72, 10, 70); g.fillRect(W * 0.6 - 10, H * 0.72, 10, 70);
     },
-    negative(g, W, H, r) {
-      presets.street(g, W, H, r);
-      const d = g.getImageData(0, 0, W, H), p = d.data;
-      for (let i = 0; i < p.length; i += 4) { const l = 255 - (p[i] * 0.3 + p[i + 1] * 0.59 + p[i + 2] * 0.11); p[i] = l * 0.55; p[i + 1] = l * 0.95; p[i + 2] = l * 0.7; }
-      g.putImageData(d, 0, 0);
-    },
+    negative(g, W, H, r) { presets.street(g, W, H, r); },
     rain(g, W, H, r) {
       presets.street(g, W, H, r);
-      g.fillStyle = 'rgba(40,60,80,.35)'; g.fillRect(0, 0, W, H);
-      g.strokeStyle = 'rgba(200,220,240,.25)'; g.lineWidth = 1.5;
-      for (let i = 0; i < 600; i++) { const x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 6, y + 26); g.stroke(); }
+      g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2;
+      for (let i = 0; i < 700; i++) { const x = r() * W, y = r() * H; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 6, y + 28); g.stroke(); }
     },
     manor(g, W, H, r) {
-      grad(g, W, H, [[0, '#d9d9d6'], [1, '#5d5d5a']]);
-      trees(g, r, 40, H * 0.75, 200, 360, '#3a3a38', W);
-      g.fillStyle = '#1d1d1c'; const x = W * 0.3, y = H * 0.35; g.fillRect(x, y, W * 0.4, H * 0.45);
+      grad(g, W, H, [[0, '#ddd'], [1, '#555']]);
+      moon(g, W * 0.2, H * 0.2, 60);
+      trees(g, r, 40, H * 0.75, 200, 360, '#444', W);
+      g.fillStyle = '#151515'; const x = W * 0.3, y = H * 0.35; g.fillRect(x, y, W * 0.4, H * 0.45);
       g.beginPath(); g.moveTo(x - 30, y); g.lineTo(W * 0.5, y - 160); g.lineTo(x + W * 0.4 + 30, y); g.fill();
-      g.fillRect(x + 40, y - 150, 40, 120); g.fillStyle = '#9a9a92';
+      g.fillRect(x + 40, y - 150, 40, 120); g.fillStyle = '#aaa';
       for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) g.fillRect(x + 40 + i * 95, y + 40 + j * 110, 34, 60);
-      fog(g, W, H, H * 0.82, 'rgba(230,230,226,.6)');
+      glow(g, W * 0.5, H * 0.85, 10, 500, 'rgba(255,255,255,.45)');
     },
-    plain(g, W, H) { grad(g, W, H, [[0, '#1f2b28'], [1, '#0b100f']]); }
+    plain(g, W, H) { grad(g, W, H, [[0, '#1a1a1a'], [1, '#050505']]); glow(g, W * 0.5, H * 0.4, 10, 700, 'rgba(255,255,255,.25)'); }
   };
 
-  function background(loc) {
-    const key = 'bg:' + loc.id + ':' + (loc.preset || 'plain');
-    if (cache[key]) return cache[key];
-    const c = document.createElement('canvas'); c.width = 1600; c.height = 900;
-    const g = c.getContext('2d');
-    (presets[loc.preset] || presets.plain)(g, 1600, 900, rng(hash(loc.id)));
-    return (cache[key] = c.toDataURL('image/jpeg', 0.86));
+  // Карта градиента: тёмное → светлое, 5 плоских уровней, как на постерах Corpsman
+  const PALETTES = {
+    town: ['#0b0b0d', '#3b2a6b', '#c2456a', '#f08a5d', '#f2d230'],
+    park: ['#0b0b0d', '#25524a', '#d0543c', '#f0a03a', '#f2e3a0'],
+    gazebo: ['#0b0b0d', '#16675f', '#4fbf7a', '#e8d36a', '#efece2'],
+    studio: ['#0b0b0d', '#3a2350', '#9a4a3a', '#e09a3a', '#f2d78a'],
+    street: ['#0b0b0d', '#1f2a5c', '#1d8f9a', '#7fd0c0', '#f2d230'],
+    negative: ['#0b0b0d', '#0d4f4a', '#1fb39a', '#8ef0b0', '#f4fbe8'],
+    rain: ['#0b0b0d', '#16224a', '#2a5d9a', '#3fb9d6', '#d8f1f6'],
+    manor: ['#0b0b0d', '#2c2c30', '#6b6b70', '#b8b6ae', '#efece2'],
+    plain: ['#0b0b0d', '#2a2350', '#1d8f9a', '#e8457a', '#f2d230']
+  };
+
+  function gradientMap(g, W, H, pal, invert, r) {
+    const d = g.getImageData(0, 0, W, H), p = d.data, cols = pal.map(hex), n = cols.length;
+    for (let i = 0; i < p.length; i += 4) {
+      let l = (p[i] * 0.3 + p[i + 1] * 0.59 + p[i + 2] * 0.11) / 255;
+      if (invert) l = 1 - l;
+      l += (r() - 0.5) * 0.08;
+      const c = cols[Math.max(0, Math.min(n - 1, Math.floor(l * n)))];
+      p[i] = c[0]; p[i + 1] = c[1]; p[i + 2] = c[2];
+    }
+    g.putImageData(d, 0, 0);
   }
 
-  window.Art = { sprite, background, presets: Object.keys(presets) };
+  function background(loc) {
+    const preset = (loc && loc.preset) || 'plain';
+    const key = 'bg:' + (loc && loc.id) + ':' + preset;
+    if (cache[key]) return cache[key];
+    const W = 1280, H = 720;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    const r = rng(hash(loc && loc.id));
+    g.save(); g.scale(W / 1600, H / 900); (presets[preset] || presets.plain)(g, 1600, 900, r); g.restore();
+    gradientMap(g, W, H, PALETTES[preset] || PALETTES.plain, preset === 'negative', r);
+    return (cache[key] = c.toDataURL('image/jpeg', 0.85));
+  }
+
+  // Шум для «переключения канала» и плёнки
+  function noise(size, alpha) {
+    const key = 'noise:' + size + ':' + alpha;
+    if (cache[key]) return cache[key];
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d'); const d = g.createImageData(size, size);
+    for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = alpha; }
+    g.putImageData(d, 0, 0);
+    return (cache[key] = c.toDataURL('image/png'));
+  }
+
+  window.Art = { sprite, background, noise, hash, rng, presets: Object.keys(presets) };
 })();

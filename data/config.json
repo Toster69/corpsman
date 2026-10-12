@@ -1,7 +1,9 @@
 {
-  "title": "Санитары",
+  "title": "Corpsman · Санитары",
   "subtitle": "Хроники Рэйвенвудса",
   "channel": "Хроники Ходов",
+  "logo": "assets/brand/logo.webp",
+  "banner": "assets/brand/banner.webp",
   "repo": "Toster69/corpsman",
   "branch": "main",
   "channelUrl": "https://www.youtube.com/@",
@@ -44,5 +46,19 @@
       "term": "Взрыв кубика",
       "text": "Если на кубике выпал максимум, его бросают ещё раз и прибавляют результат. Жетоны можно добавить, чтобы довести бросок до максимума."
     }
-  ]
+  ],
+  "recapTitle": "Ранее в Corpsman",
+  "introVideo": {
+    "youtube": "",
+    "video": "",
+    "seconds": 20
+  },
+  "sounds": {
+    "roll": "",
+    "clue": "",
+    "static": ""
+  },
+  "music": {
+    "ending": ""
+  }
 }
