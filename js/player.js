@@ -128,6 +128,7 @@
       </div></div>`;
     document.body.appendChild(root);
     const stage = $('stage');
+    applyNovel(stage);
     $('static').style.backgroundImage = `url('${Art.noise(128, 255)}')`;
     root.querySelector('.film-layer').style.backgroundImage = `url('${Art.noise(160, 40)}')`;
 
@@ -154,6 +155,15 @@
 
     if (!sceneId) startScreen();
     else { const si = Math.max(0, ep.scenes.findIndex((s) => s.id === sceneId)); const [a, b] = settle(ep, si, Number.isFinite(lineIdx) ? lineIdx : 0); go(a, b, true); }
+  }
+
+  // Размеры из config.json → "novel"
+  function applyNovel(stage) {
+    const n = A().S.config.novel || {};
+    const map = { spriteHeight: '--sh', spriteBottom: '--sb', boxHeight: '--bh', textSize: '--ts', nameSize: '--ns', textWeight: '--tw', mobileSpriteHeight: '--msh', mobileSpriteBottom: '--msb', mobileTextSize: '--mts' };
+    Object.entries(map).forEach(([k, v]) => { if (n[k] !== undefined && n[k] !== '') stage.style.setProperty(v, n[k]); });
+    if (n.textFont) stage.style.setProperty('--f-vn', `'${n.textFont}', var(--f-ui)`);
+    if (n.narrationFont) stage.style.setProperty('--f-narr', `'${n.narrationFont}', var(--f-ui)`);
   }
 
   function close() {
@@ -340,6 +350,8 @@
         scheduleBlink(img);
       }
       w.style.left = (POS[pos] ?? (parseFloat(pos) || 50)) + '%';
+      w.style.setProperty('--sk', c.spriteScale || 1);
+      w.style.setProperty('--y', c.spriteY || 0);
       w.classList.toggle('speak', cid === speaker);
       w.classList.toggle('dim', !!speaker && cid !== speaker && speaker !== 'narrator');
       w.classList.toggle('glitchy', e === 'glitch');

@@ -60,5 +60,18 @@
   },
   "music": {
     "ending": ""
+  },
+  "novel": {
+    "spriteHeight": 118,
+    "spriteBottom": -22,
+    "boxHeight": 30,
+    "textSize": 4.6,
+    "nameSize": 5.2,
+    "textFont": "Rubik",
+    "narrationFont": "Rubik",
+    "textWeight": 500,
+    "mobileSpriteHeight": 78,
+    "mobileSpriteBottom": 24,
+    "mobileTextSize": 18
   }
 }
