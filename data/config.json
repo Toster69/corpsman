@@ -6,12 +6,12 @@
   "banner": "assets/brand/banner.webp",
   "repo": "Toster69/corpsman",
   "branch": "main",
-  "channelUrl": "https://www.youtube.com/@",
+  "channelUrl": "https://www.youtube.com/@ChronicleMove",
   "system": "Kids on Bikes (наша интерпретация)",
-  "gm": "Тостер Годзи",
-  "intro": "В этом мире таинственные существа, зеркальные люди, воплощают человеческие эмоции. Иногда они делают добро, иногда зло. Повлиять на них могут только особенные люди — санитары. Но эта история не о них. Она о подростках из тихого города Рэйвенвудс.",
+  "gm": "Тостер Годя",
+  "intro": "В этом мире таинственные существа, зеркальные люди, воплощают человеческие эмоции. Иногда они делают добро, иногда зло. Повлиять на них могут только особенные люди — Санитары. Но эта история не о них. Она о подростках из тихого города Рэйвенвудс.",
   "episodes": [
-    "ep001"
+    "ep000"
   ],
   "glossary": [
     {
@@ -50,8 +50,8 @@
   "recapTitle": "Ранее в Corpsman",
   "introVideo": {
     "youtube": "",
-    "video": "",
-    "seconds": 20
+    "video": "assets/video/intro.webm",
+    "seconds": 51
   },
   "sounds": {
     "roll": "",
@@ -59,19 +59,137 @@
     "static": ""
   },
   "music": {
-    "ending": ""
+    "ending": "assets/audio/music/ending.mp3"
   },
   "novel": {
-    "spriteHeight": 118,
-    "spriteBottom": -22,
-    "boxHeight": 30,
-    "textSize": 4.6,
-    "nameSize": 5.2,
+    "spriteHeight": 150,
+    "spriteBottom": -62,
+    "boxHeight": 24,
+    "textSize": 3.5,
+    "nameSize": 4.2,
     "textFont": "Rubik",
     "narrationFont": "Rubik",
     "textWeight": 500,
-    "mobileSpriteHeight": 78,
-    "mobileSpriteBottom": 24,
-    "mobileTextSize": 18
-  }
+    "mobileSpriteHeight": 112,
+    "mobileSpriteBottom": -22,
+    "mobileTextSize": 18,
+    "sceneTransition": "halftone",
+    "bgTransition": "fade",
+    "sceneIntro": true,
+    "sceneTitleMs": 1900,
+    "outline": "auto"
+  },
+  "about": {
+    "title": "О проекте",
+    "lead": "Действие происходит в начале 2000-х в провинциальных американских городках с особой атмосферой: здесь смешиваются культуры и традиции, а под покровом обыденности скрываются мрачные тайны. Игрокам предстоит расследовать аномальные события, балансируя между реальностью и потусторонним.",
+    "text": "Система Kids on Bikes идеально подходит для этой истории: она делает акцент на исследовании, напряжённой атмосфере и развитии персонажей.",
+    "timeline": [
+      {
+        "when": "2014",
+        "what": "Визуальная новелла",
+        "title": "Санитары: Азбука Смерти",
+        "url": "https://anivisual.net/stuff/2-1-0-262"
+      },
+      {
+        "when": "Затем",
+        "what": "Комикс",
+        "title": "Санитары: Смерть и перерождение",
+        "url": "https://vk.com/corpsman_game?from=groups"
+      },
+      {
+        "when": "Теперь",
+        "what": "Настольная ролевая игра",
+        "title": "Санитары: Узы Смерти",
+        "url": "https://www.youtube.com/@ChronicleMove"
+      },
+      {
+        "when": "И снова",
+        "what": "Визуальная новелла по нашим играм",
+        "title": "Этот сайт",
+        "text": "Наши игры можно не только посмотреть, но и пережить самому.",
+        "url": ""
+      }
+    ],
+    "music": {
+      "name": "Idle Beats",
+      "url": "https://www.youtube.com/@IdleBeatsMusic",
+      "quote": "Где музыкальное спокойствие сочетается с творчеством."
+    }
+  },
+  "warning": {
+    "image": "assets/brand/warning.webp",
+    "seconds": 7
+  },
+  "tvGlass": "assets/brand/tv-glass.webp",
+  "channelPage": {
+    "title": "Хроники Ходов",
+    "lead": "Канал о настольных ролевых играх. Играем в D&D и Kids on Bikes по двум собственным авторским мирам и выкладываем полные игровые сессии в формате актуал-плей.",
+    "note": "Этот сайт — пересказ игр канала в формате визуальной новеллы: те же сессии, но их можно не только посмотреть, но и пройти самому.",
+    "worlds": [
+      {
+        "name": "Аволар",
+        "system": "D&D 5e",
+        "text": "Авторский мир на стыке фэнтези и научной фантастики. Каждую тысячу лет в нём сменяется пантеон богов, а вместе с ним меняются расы, устройство мира и эпоха: от диких племён и Средневековья до стимпанка и магических технологий."
+      },
+      {
+        "name": "Санитары",
+        "system": "Kids on Bikes",
+        "text": "Авторский мир в жанре городской мистики. Человеческие эмоции здесь становятся реальными и опасными. Игроки — обычные подростки, которые сталкиваются со странными силами и встречают Санитаров, единственных, кто способен им противостоять.",
+        "here": true
+      }
+    ],
+    "art": "Для обеих игр мы рисуем авторские арты персонажей, локаций и существ. Доски с артами открыты для зрителей, а на сайте кампаний есть база знаний по каждому миру.",
+    "links": [
+      {
+        "name": "YouTube",
+        "label": "@ChronicleMove",
+        "url": "https://www.youtube.com/@ChronicleMove"
+      },
+      {
+        "name": "Boosty",
+        "label": "boosty.to/toster69",
+        "url": "https://boosty.to/toster69"
+      },
+      {
+        "name": "Telegram",
+        "label": "t.me/ChronicleMove_Avolar",
+        "url": "https://t.me/ChronicleMove_Avolar"
+      },
+      {
+        "name": "Галерея «Аволара»",
+        "label": "rb.gy/jw36x2",
+        "url": "https://rb.gy/jw36x2"
+      }
+    ]
+  },
+  "tracks": [
+    {
+      "id": "calm",
+      "title": "Начало эпизода",
+      "src": "assets/audio/music/calm.mp3",
+      "free": true,
+      "where": "Звучит в начале истории"
+    },
+    {
+      "id": "mystery",
+      "title": "Мистическая музыка",
+      "src": "assets/audio/music/mystery.mp3",
+      "hint": "Звучит, когда рядом зеркальные люди",
+      "where": "Эпизод 00"
+    },
+    {
+      "id": "tension",
+      "title": "Напряжение",
+      "src": "assets/audio/music/tension.mp3",
+      "hint": "Звучит, когда мир тянет тебя вниз",
+      "where": "Эпизод 00"
+    },
+    {
+      "id": "ending",
+      "title": "Конец эпизода",
+      "src": "assets/audio/music/ending.mp3",
+      "hint": "Звучит в финальных титрах",
+      "where": "Эпизод 00"
+    }
+  ]
 }

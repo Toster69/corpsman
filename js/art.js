@@ -57,7 +57,7 @@
       </g>`;
     let inner = body;
     if (e === 'glitch') inner = `<g opacity=".55" transform="translate(-18 0)">${body}</g><g opacity=".55" transform="translate(18 6)">${body}</g>${body}`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 900"><defs><clipPath id="c${id}"><path d="M232 0 L400 0 L400 900 L262 900 L284 700 L240 560 L264 420 L230 330 L266 210 L240 120 Z"/></clipPath></defs>${inner}</svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-250 0 900 900"><defs><clipPath id="c${id}"><path d="M232 0 L400 0 L400 900 L262 900 L284 700 L240 560 L264 420 L230 330 L266 210 L240 120 Z"/></clipPath></defs>${inner}</svg>`;
     return (cache[key] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
   }
 
@@ -65,7 +65,7 @@
   function mirrorFigure(blink) {
     const s = (d, w) => `<path d="${d}" fill="none" stroke="#f4fbff" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round"/>`;
     const o = 'M170 300 Q150 250 168 210 Q160 160 186 120 Q190 160 200 150 Q206 100 222 70 Q226 130 240 140 Q252 180 236 220 Q256 260 232 300 Q236 330 214 340 L216 380 Q300 400 318 470 L330 700 Q330 720 314 718 L300 560 L290 900 L230 900 L206 680 L190 900 L130 900 L112 560 L94 720 Q78 720 80 700 L92 470 Q110 400 186 380 L186 340 Q166 330 170 300 Z';
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 900"><path d="${o}" fill="#0b0b0d"/>${s(o, 7)}<g transform="translate(5 -4)" opacity=".45">${s(o, 3)}</g>${blink ? '' : '<path d="M184 262 Q196 252 202 268 Q192 276 184 262 Z M214 262 Q224 254 232 266 Q222 274 214 262 Z" fill="#f4fbff"/>'}</svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-250 0 900 900"><path d="${o}" fill="#0b0b0d"/>${s(o, 7)}<g transform="translate(5 -4)" opacity=".45">${s(o, 3)}</g>${blink ? '' : '<path d="M184 262 Q196 252 202 268 Q192 276 184 262 Z M214 262 Q224 254 232 266 Q222 274 214 262 Z" fill="#f4fbff"/>'}</svg>`;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 

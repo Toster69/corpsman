@@ -1,0 +1,1 @@
+OFL-1.1: Rubik, Oswald, PT Serif, Rubik Mono One, Russo One, Unbounded, JetBrains Mono (SIL Open Font License 1.1, https://openfontlicense.org). Файлы взяты из пакетов @fontsource.

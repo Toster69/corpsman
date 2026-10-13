@@ -3,84 +3,143 @@
     "id": "emily",
     "name": "Эмили Картер",
     "short": "Эмили",
-    "role": "Главная героиня",
+    "role": "Героиня истори",
     "player": "Анна Морган (Аня)",
     "color": "#e8834a",
     "age": "17 лет",
-    "tags": ["школьница", "фотограф", "художница"],
+    "tags": [
+      "школьница",
+      "фотограф",
+      "художница"
+    ],
     "description": "Тихая и застенчивая рыжая девушка, рост 153 см. Родилась и выросла в Рэйвенвудсе. После школы гуляет по осеннему парку, снимает на плёнку и делает зарисовки в беседке. Работает в фотостудии Silver Frame у мистера Томпсона, которого считает почти отцом — с собственным отцом они не близки. Зелёные глаза от матери, рыжие волосы от отца.",
-    "stats": { "Шарм": "d8", "Стойкость": "d10" },
-    "look": { "hair": "#c4582a", "skin": "#f1d3bd", "cloth": "#4d6b52", "accent": "#e8c27a", "hairStyle": "long" },
-    "sprites": { "default": "assets/sprites/emily/default.png", "worried": "", "scared": "", "smile": "" }
+    "stats": {
+      "Шарм": "d8",
+      "Стойкость": "d10"
+    },
+    "look": {
+      "hair": "#c4582a",
+      "skin": "#f1d3bd",
+      "cloth": "#4d6b52",
+      "accent": "#e8c27a",
+      "hairStyle": "long"
+    },
+    "sprites": {
+      "default": "assets/sprites/emily/default.webp",
+      "worried": "",
+      "scared": "",
+      "smile": ""
+    }
   },
   {
     "id": "stranger",
-    "name": "Девушка без возраста",
-    "short": "Незнакомка",
+    "name": "Айза",
+    "short": "Айза",
     "role": "Загадка",
     "player": "Ведущий",
     "color": "#8fb8a8",
     "age": "18? 30? 50?",
-    "tags": ["курит", "портсигар", "знает Картеров"],
-    "description": "Высокая, черноволосая, в чёрном пиджаке, с короткой стрижкой. Лицо будто собрано из разных возрастов сразу. Курит, но окурки складывает в карманный портсигар. Знает семью Картер. Её облик стирается из памяти, а на рисунках не складывается. Похожая женщина есть на снимке 1886 года — и исчезает с него.",
+    "tags": [
+      "курит",
+      "портсигар",
+      "знает Картеров"
+    ],
+    "description": "Высокая, черноволосая, в чёрной кожаной куртке, с короткой стрижкой. Своего имени Эмили так и не назвала. Лицо будто собрано из разных возрастов сразу. Курит, но окурки складывает в карманный портсигар. Знает семью Картер. Её облик стирается из памяти, а на рисунках не складывается. Похожая женщина есть на снимке 1886 года — и исчезает с него.",
     "stats": {},
-    "look": { "hair": "#141618", "skin": "#e4dcd2", "cloth": "#1d2124", "accent": "#8fb8a8", "hairStyle": "short" },
-    "sprites": { "default": "assets/sprites/stranger/default.png", "smoke": "", "glitch": "" }
+    "look": {
+      "hair": "#141618",
+      "skin": "#e4dcd2",
+      "cloth": "#1d2124",
+      "accent": "#8fb8a8",
+      "hairStyle": "short"
+    },
+    "sprites": {
+      "default": "assets/sprites/aiza/01_AIZA_neutral_p1_v001.webp",
+      "thinking": "assets/sprites/aiza/02_AIZA_thinking_p1_v001.webp",
+      "happy": "assets/sprites/aiza/03_AIZA_happy_p1_v001.webp",
+      "angry": "assets/sprites/aiza/04_AIZA_angry_p1_v001.webp",
+      "cross": "assets/sprites/aiza/05_AIZA_cross_p1_v001.webp",
+      "power": "assets/sprites/aiza/06_AIZA_power_p1_v001.webp",
+      "back": "assets/sprites/aiza/07_AIZA_BACK_p1_v001.webp",
+      "damage": "assets/sprites/aiza/07_AIZA_DAMAGE_p1_v001.webp",
+      "smoke": "assets/sprites/aiza/05_AIZA_cross_p1_v001.webp"
+    },
+    "immune": true
   },
   {
     "id": "thompson",
-    "name": "Мистер Томпсон",
-    "short": "Томпсон",
-    "role": "Наставник",
+    "name": "Mr. Томпсон",
+    "short": "Mr.Томпсон",
+    "role": "Владельц фото салона",
     "player": "Ведущий",
     "color": "#c9a46a",
     "age": "в годах",
-    "tags": ["фотограф", "Silver Frame Studio", "больные колени"],
+    "tags": [
+      "фотограф",
+      "Silver Frame Studio",
+      "больные колени"
+    ],
     "description": "Очень высокий, спокойный и терпеливый мужчина. Известный фотограф: объездил весь мир и вернулся в родной городок, где открыл Silver Frame Studio. Научил Эмили работать с плёнкой, камерами, проявкой и композицией. Любит пошутить, когда даёт фидбэк. Жалуется на колени («эти детки уже не могут туда подняться»).",
     "stats": {},
-    "look": { "hair": "#b8b3aa", "skin": "#e6c8ad", "cloth": "#6b4f36", "accent": "#c9a46a", "hairStyle": "old" },
-    "sprites": { "default": "" }
-  },
-  {
-    "id": "narrator",
-    "name": "Зеркальный Человек",
-    "short": "Ведущий",
-    "role": "Рассказчик",
-    "player": "Тостер Годзи",
-    "color": "#b9c9cf",
-    "age": "—",
-    "tags": ["ведущий", "везде сразу"],
-    "description": "Голос, который переключает каналы. Ведущий игры, пока не выбравший себе роль: «Я был везде сразу, называйте меня Зеркальный Человек».",
-    "stats": {},
-    "look": { "hair": "#9fb2b8", "skin": "#cfdade", "cloth": "#5b6b70", "accent": "#e8f4f6", "hairStyle": "short" },
-    "sprites": { "default": "" }
+    "look": {
+      "hair": "#b8b3aa",
+      "skin": "#e6c8ad",
+      "cloth": "#6b4f36",
+      "accent": "#c9a46a",
+      "hairStyle": "old"
+    },
+    "sprites": {
+      "default": "assets/sprites/thompson.png"
+    }
   },
   {
     "id": "jake",
-    "name": "Джейк",
+    "name": "Джейк Фишер",
     "short": "Джейк",
-    "role": "Коллега",
+    "role": "Фотограф",
     "player": "—",
     "color": "#7fa0d0",
     "age": "студент",
-    "tags": ["Silver Frame Studio", "пропал?"],
+    "tags": [
+      "Silver Frame Studio",
+      "пропал?"
+    ],
     "description": "Работает в студии вместе с Эмили; при упоминании о нём Эмили краснеет. Готовил фотографии для дипломной работы в колледже — от них зависит его стипендия. Не вышел на работу и не берёт трубку. Пока появляется только в разговорах.",
     "stats": {},
-    "look": { "hair": "#5a3e2b", "skin": "#ecc9ad", "cloth": "#3e5577", "accent": "#7fa0d0", "hairStyle": "short" },
-    "sprites": { "default": "" }
+    "look": {
+      "hair": "#5a3e2b",
+      "skin": "#ecc9ad",
+      "cloth": "#3e5577",
+      "accent": "#7fa0d0",
+      "hairStyle": "short"
+    },
+    "sprites": {
+      "default": "assets/sprites/jake.png"
+    }
   },
   {
     "id": "reeves",
-    "name": "Миссис Ривз",
-    "short": "Миссис Ривз",
-    "role": "Старожил",
+    "name": "Mrs. Ривз",
+    "short": "Mrs. Ривз",
+    "role": "Старушка",
     "player": "—",
     "color": "#a68cb8",
     "age": "самая старая жительница",
-    "tags": ["особняк", "родословная"],
+    "tags": [
+      "особняк",
+      "родословная"
+    ],
     "description": "«Странная старушка», живущая недалеко от особняка Рэйвенвуд-Мэнор. По словам Томпсона, далёкий потомок сестры женщины со снимка 1886 года. Томпсон просил не говорить ей, что назвал её самой старой в городе.",
     "stats": {},
-    "look": { "hair": "#d8d4cf", "skin": "#e8d2c2", "cloth": "#5c4a6b", "accent": "#a68cb8", "hairStyle": "old" },
-    "sprites": { "default": "" }
+    "look": {
+      "hair": "#d8d4cf",
+      "skin": "#e8d2c2",
+      "cloth": "#5c4a6b",
+      "accent": "#a68cb8",
+      "hairStyle": "old"
+    },
+    "sprites": {
+      "default": "assets/sprites/reeves.png"
+    }
   }
 ]

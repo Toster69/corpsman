@@ -8,7 +8,7 @@
 
   // ---------- Настройки ----------
   const SET_KEY = 'corpsman:settings';
-  function settings() { try { return Object.assign({ sound: true, rolls: true, intro: true, speed: 1 }, JSON.parse(A().store.get(SET_KEY) || '{}')); } catch (e) { return { sound: true, rolls: true, intro: true, speed: 1 }; } }
+  function settings() { try { return Object.assign({ sound: true, dice: true, intro: true, speed: 1 }, JSON.parse(A().store.get(SET_KEY) || '{}')); } catch (e) { return { sound: true, dice: true, intro: true, speed: 1 }; } }
   function saveSettings(s) { A().store.set(SET_KEY, JSON.stringify(s)); }
 
   // ---------- Звук ----------
@@ -20,6 +20,7 @@
       src = src && src !== 'none' ? src : '';
       if (src === this.cur) return;
       this.cur = src;
+      if (src && window.Music) { const t = Music.unlockBySrc(src); if (t && P) trackToast(t); }
       const old = this.music; this.music = null;
       if (old) this.fade(old, 0, 900, () => { old.pause(); });
       if (!src) return;
@@ -53,6 +54,8 @@
   const $ = (id) => document.getElementById(id);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const isRoll = (l) => !!(l && l.roll);
+  const isCheck = (l) => !!(l && l.check);
+  const isNarrator = (c) => !!c && (c.id === 'narrator' || c.narrator === true);
   const lineStr = (l) => l.say || l.think || l.n || '';
 
   function stateAt(ep, si, li) {
@@ -77,20 +80,31 @@
       li += dir;
       if (li >= ep.scenes[si].lines.length) { si++; li = 0; if (si >= ep.scenes.length) return null; }
       if (li < 0) { si--; if (si < 0) return null; li = ep.scenes[si].lines.length - 1; }
-      if (!isRoll(ep.scenes[si].lines[li])) return [si, li];
+      const l = ep.scenes[si].lines[li];
+      if (!isRoll(l) && !(dir < 0 && isCheck(l))) return [si, li];
     }
   }
   function settle(ep, si, li) {
     if (!ep.scenes[si]) { si = 0; li = 0; }
     li = Math.max(0, Math.min(li || 0, ep.scenes[si].lines.length - 1));
-    if (isRoll(ep.scenes[si].lines[li])) { const n = nextPos(ep, si, li, 1); if (n) return n; }
+    if (isRoll(ep.scenes[si].lines[li]) || isCheck(ep.scenes[si].lines[li])) { const n = nextPos(ep, si, li, 1); if (n) return n; }
     return [si, li];
   }
-  function rollsBefore(sc, li) { const out = []; for (let i = li - 1; i >= 0 && isRoll(sc.lines[i]); i--) out.unshift(sc.lines[i].roll); return out; }
+
 
   // ---------- Открытие ----------
+  function trackToast(t) {
+    const st = $('stage'); if (!st) return;
+    const d = document.createElement('div'); d.className = 'toast track'; d.style.cssText = A().torn('tr' + t.id, 3, 6, 'tblr');
+    d.innerHTML = `${A().ransom('Новый трек', { seed: 'trk' })}<b>♪ ${A().esc(t.title)}</b><small>теперь в плеере на сайте</small>`;
+    st.appendChild(d); later(() => d.remove(), 3800);
+  }
+
   function open(ep, sceneId, lineIdx) {
     close();
+    if (window.Music) Music.pause();
+    // Бонусная сцена: отдельный мини-эпизод из ep.bonus.scene
+    if (sceneId === 'bonus' && ep.bonus && ep.bonus.scene) ep = Object.assign({}, ep, { scenes: [Object.assign({ id: 'bonus', title: ep.bonus.title || 'Бонус' }, ep.bonus.scene, { id: 'bonus' })], isBonus: true, teaser: null });
     const { esc, S } = A();
     const set = settings();
     P = { ep, si: 0, li: 0, typing: null, auto: false, autoT: null, panel: null, overlay: null, timers: new Set(), log: [], set, lastBg: null, lastScene: -1, rain: null, busy: false };
@@ -100,16 +114,16 @@
     root.innerHTML = `
       <div class="p-bar">
         <a href="#ep-${ep.id}" class="pb" title="Выйти (Esc)" aria-label="Выйти">✕</a>
-        <span class="p-title"><b>${esc(String(ep.number).padStart(2, '0'))}</b> ${esc(ep.title)} <span id="p-sc"></span></span>
+        <span class="p-title"><b>${esc(String(ep.number).padStart(2, '0'))}</b> ${esc(ep.title)} <span id="p-sc"></span><i class="saved" id="saved">● Сохранено</i></span>
         <button class="pb" id="b-back" title="Назад (←)" aria-label="Назад">◀</button>
         <button class="pb" id="b-auto" title="Автопрокрутка">Авто</button>
         <button class="pb" id="b-sound" title="Звук">${set.sound ? 'Звук' : 'Без звука'}</button>
         <button class="pb" id="b-log">Лог</button>
         <button class="pb" id="b-scenes">Сцены</button>
-        <button class="pb" id="b-clues">Улики</button>
+        <button class="pb" id="b-clues">Дело</button>
         <button class="pb" id="b-set" aria-label="Настройки">⚙</button>
       </div>
-      <div class="p-wrap"><div class="stage" id="stage" tabindex="0" aria-live="polite">
+      <div class="p-wrap"><div class="tv"><div class="stage" id="stage" tabindex="0" aria-live="polite">
         <div class="bg" id="bg1"></div><div class="bg" id="bg2" style="opacity:0"></div>
         <div class="layer ht-layer"></div>
         <div class="sprites" id="sprites"></div>
@@ -119,13 +133,24 @@
         <div class="layer mirror-layer"></div>
         <div class="bug">${esc(S.config.channel || '').replace(' ', '<br>')}</div>
         <div class="box" id="box">
-          <div class="box-bg" style="${A().torn('box' + ep.id, 3, 1.6, 't')}"></div>
+          <div class="box-bg"></div>
+          <div class="tail" id="tail" hidden></div>
           <div class="plate" id="plate" hidden></div>
           <div class="txt" id="txt"></div>
-          <div class="meta"><span class="chip-roll" id="chip" hidden></span><span id="tc"></span><span class="next" id="nexti"></span></div>
+          <div class="meta"><span id="tc"></span><span class="next" id="nexti"></span></div>
+          <div class="qm" id="qm">
+            <button data-q="back" title="Предыдущая реплика (← или колесо вверх)">◀ Назад</button>
+            <button data-q="next" title="Следующая реплика (→, пробел или колесо вниз)">Вперёд ▶</button>
+            <button data-q="skip" title="Быстрая перемотка (удерживайте Ctrl)">Перемотка ▸▸</button>
+            <button data-q="auto" title="Автопрокрутка">Авто</button>
+            <button data-q="hide" title="Скрыть текст (H)">Скрыть</button>
+            <button data-q="log" title="История реплик (L)">Лог</button>
+          </div>
         </div>
         <div class="layer static" id="static"></div>
-      </div></div>`;
+        <div class="layer crt"></div>
+        <div class="layer glass" style="background-image:url('${esc(S.config.tvGlass || 'assets/brand/tv-glass.webp')}')"></div>
+      </div><span class="tv-led" aria-hidden="true"></span><span class="tv-brand" aria-hidden="true">CORPSMAN</span></div></div>`;
     document.body.appendChild(root);
     const stage = $('stage');
     applyNovel(stage);
@@ -134,18 +159,45 @@
 
     stage.addEventListener('click', (e) => {
       Sound.unlock();
+      if (stage.classList.contains('ui-hidden')) return toggleHide(false);
       if (e.target.closest('a,button,.ov,.side')) return;
       if (P.panel) return closePanel();
+      if (P.skip) return setSkip(false);
       next();
     });
+    stage.addEventListener('wheel', (e) => {
+      if (P.overlay || P.panel || e.target.closest('.side')) return;
+      e.preventDefault();
+      const now = Date.now(); if (now - (P.wheelT || 0) < 220) return; P.wheelT = now;
+      if (stage.classList.contains('ui-hidden')) toggleHide(false);
+      if (e.deltaY < 0) back(); else next();
+    }, { passive: false });
+    $('qm').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      e.stopPropagation(); Sound.unlock();
+      const q = b.dataset.q;
+      if (q === 'back') { setSkip(false); back(); }
+      if (q === 'next') { setSkip(false); next(); }
+      if (q === 'skip') setSkip(!P.skip);
+      if (q === 'auto') $('b-auto').click();
+      if (q === 'hide') toggleHide(true);
+      if (q === 'log') panel('log');
+    });
+    document.addEventListener('keyup', P.keyup = (e) => { if (e.key === 'Control' && P && P.skipHeld) { P.skipHeld = false; setSkip(false); } });
     stage.addEventListener('keydown', (e) => {
       if (P.overlay) { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); P.overlay.dispatchEvent(new CustomEvent('skip')); } return; }
-      if (['ArrowRight', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); Sound.unlock(); next(); }
+      if (stage.classList.contains('ui-hidden') && !['Control', 'Shift', 'Alt'].includes(e.key)) { e.preventDefault(); return toggleHide(false); }
+      if (e.key === 'Control' && !e.repeat) { P.skipHeld = true; return setSkip(true); }
+      if (e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') { e.preventDefault(); return toggleHide(true); }
+      if (e.key === 'l' || e.key === 'L' || e.key === 'д' || e.key === 'Д') { e.preventDefault(); return panel('log'); }
+      if (e.key === 'PageUp') { e.preventDefault(); back(); }
+      if (e.key === 'PageDown') { e.preventDefault(); next(); }
+      if (['ArrowRight', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); Sound.unlock(); setSkip(false); next(); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); back(); }
       if (e.key === 'Escape') { if (P.panel) closePanel(); else location.hash = 'ep-' + ep.id; }
     });
     $('b-back').onclick = back;
-    $('b-auto').onclick = () => { P.auto = !P.auto; $('b-auto').classList.toggle('on', P.auto); if (P.auto && !P.typing && !P.overlay) next(); else clearTimeout(P.autoT); };
+    $('b-auto').onclick = () => { P.auto = !P.auto; $('b-auto').classList.toggle('on', P.auto); $('qm').querySelector('[data-q=auto]').classList.toggle('on', P.auto); if (P.auto && !P.typing && !P.overlay) next(); else clearTimeout(P.autoT); };
     $('b-sound').onclick = () => { Sound.unlock(); P.set.sound = !P.set.sound; saveSettings(P.set); $('b-sound').textContent = P.set.sound ? 'Звук' : 'Без звука'; Sound.mute(!P.set.sound); };
     $('b-log').onclick = () => panel('log');
     $('b-scenes').onclick = () => panel('scenes');
@@ -155,6 +207,31 @@
 
     if (!sceneId) startScreen();
     else { const si = Math.max(0, ep.scenes.findIndex((s) => s.id === sceneId)); const [a, b] = settle(ep, si, Number.isFinite(lineIdx) ? lineIdx : 0); go(a, b, true); }
+  }
+
+  // Перемотка и скрытие текста
+  function setSkip(on) {
+    if (!P) return;
+    P.skip = !!on;
+    const b = $('qm') && $('qm').querySelector('[data-q=skip]'); if (b) b.classList.toggle('on', P.skip);
+    $('stage') && $('stage').classList.toggle('skipping', P.skip);
+    clearTimeout(P.skipT);
+    if (P.skip) skipStep();
+  }
+  function skipStep() {
+    if (!P || !P.skip) return;
+    if (P.overlay || P.busy) return setSkip(false);
+    if (P.typing) P.finishType();
+    const n = nextPos(P.ep, P.si, P.li, 1);
+    if (n && P.set.dice) { const l = P.ep.scenes[n[0]].lines[n[1]]; if (isCheck(l) && Case.status(P.ep, l.check.clue) !== 'found' && !(P.rolled || {})[l.check.clue]) { setSkip(false); return go(n[0], n[1], true); } }
+    if (!n) { setSkip(false); return ending(); }
+    go(n[0], n[1], true);
+    P.skipT = later(skipStep, 110);
+  }
+  function toggleHide(on) {
+    const st = $('stage'); if (!st) return;
+    st.classList.toggle('ui-hidden', on);
+    if (on) setSkip(false);
   }
 
   // Размеры из config.json → "novel"
@@ -171,6 +248,7 @@
     clearInterval(P.typing); clearTimeout(P.autoT); cancelAnimationFrame(P.rain);
     P.timers.forEach((t) => clearTimeout(t));
     Sound.stopAll();
+    if (P.keyup) document.removeEventListener('keyup', P.keyup);
     const el = $('player'); if (el) el.remove();
     document.body.classList.remove('playing');
     P = null;
@@ -212,12 +290,14 @@
         <div class="layer ht-layer"></div>
         <img class="start-logo" src="${esc(logo)}" alt="" onerror="this.remove()">
         <div class="start-in">
-          <div class="eyebrow">Эпизод ${esc(ep.number)}</div>
+          <div class="eyebrow">Эпизод ${esc(String(ep.number).padStart(2, '0'))}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
           <div class="start-title">${ransom(ep.title)}</div>
-          <div class="btns">
-            ${sc ? `<button class="btn hot" data-go="resume">Продолжить: ${esc(sc.title)}</button><button class="btn ink" data-go="start">С начала</button>` : `<button class="btn hot" data-go="start">Начать</button>`}
+          <div class="press">PRESS START</div>
+          <div class="menu" role="menu">
+            ${sc ? `<button class="mi" data-go="resume" role="menuitem"><span>▶</span> Продолжить <small>сохранение: ${esc(sc.title)}</small></button>` : ''}
+            <button class="mi" data-go="start" role="menuitem"><span>▶</span> Новая игра</button>
           </div>
-          <p class="hint">Клик или пробел — дальше · ← назад · звук включится после первого клика</p>
+          <p class="hint">Клик или пробел — дальше · колесо мыши — назад/вперёд · H — скрыть текст</p>
         </div>
       </div>`, 'ov-start');
     el.querySelectorAll('[data-go]').forEach((b) => b.onclick = async (e) => {
@@ -230,12 +310,31 @@
 
   async function prologue() {
     P.busy = true;
+    await loading();
+    if (!P) return;
+    await warningScreen();
+    if (!P) return;
     if (P.set.intro) await introVideo();
     if (!P) return;
     await previously();
     if (!P) return;
     await titleCard();
     if (P) P.busy = false;
+  }
+
+  // «Загрузка картриджа»
+  function loading() {
+    const el = overlay(`<div class="loading"><div class="ld-txt">ЗАГРУЗКА<span class="ld-dots"></span></div><div class="ld-bar"><i></i></div><div class="ld-slot">СЛОТ ${String(P.ep.number).padStart(2, '0')} · ${A().esc(P.ep.title)}</div></div>`, 'ov-load');
+    return waitOverlay(el, 1500).then(() => { if (P) closeOverlay(); });
+  }
+  // Предупреждение перед игрой (config.warning)
+  function warningScreen() {
+    const { S, esc } = A();
+    const w = P.ep.warning !== undefined ? P.ep.warning : S.config.warning;
+    if (!w || !w.image) return Promise.resolve();
+    staticBurst();
+    const el = overlay(`<div class="warn"><img src="${esc(w.image)}" alt="${esc(w.alt || 'Предупреждение')}" onerror="this.closest('.ov').dispatchEvent(new CustomEvent('skip'))"><span class="warn-hint">клик — продолжить</span></div>`, 'ov-warn');
+    return waitOverlay(el, (w.seconds || 7) * 1000).then(() => { if (P) { closeOverlay(); staticBurst(); } });
   }
 
   // Заставка: YouTube или MP4 из config.intro (или ep.intro)
@@ -301,7 +400,7 @@
       if (skipped || !P) break;
       const c = it.c && char(it.c);
       $('rc-bg').style.backgroundImage = `url('${A().bgSrc(loc(it.bg))}')`;
-      $('rc-spr').innerHTML = c ? `<img class="sticker" src="${esc(spriteSrc(c, it.e || 'default'))}" alt="">` : '';
+      $('rc-spr').innerHTML = c ? `<img class="${A().spriteCls(c, it.e || 'default')}" src="${esc(spriteSrc(c, it.e || 'default'))}" alt="">` : '';
       $('rc-cap').innerHTML = `${c ? `<b style="color:${esc(c.color)}">${esc(c.short || c.name)}</b> ` : ''}${esc(it.text)}`;
       el.querySelector('.recap').classList.remove('cut'); void el.offsetWidth; el.querySelector('.recap').classList.add('cut');
       await new Promise((r) => { tap = r; later(r, 3000); });
@@ -320,45 +419,83 @@
   // ---------- Показ строки ----------
   function go(si, li, fresh) { P.si = si; P.li = li; show(fresh); }
 
-  function setBg(id) {
+  // Переходы фонов: fade, cut, wipe, halftone, slide, zoom, static, flash
+  function setBg(id, tr) {
     const { bgSrc, loc } = A();
     const l = loc(id); const src = bgSrc(l);
     if (src === P.lastBg) return; P.lastBg = src;
-    const a = $('bg1'), b = $('bg2'); const top = a.style.opacity === '0' ? a : b, bottom = top === a ? b : a;
-    top.style.backgroundImage = `url('${src}')`; top.style.opacity = '1'; bottom.style.opacity = '0';
-    if (l && l.bg) { const im = new Image(); im.onerror = () => { top.style.backgroundImage = `url('${Art.background(l)}')`; }; im.src = src; }
+    const b1 = $('bg1'), b2 = $('bg2');
+    const cur = P.bgCur || b1, nxt = cur === b1 ? b2 : b1;
+    const first = !P.bgCur; P.bgCur = nxt;
+    if (first || matchMedia('(prefers-reduced-motion: reduce)').matches) tr = 'cut';
+    if (tr === 'static') { staticBurst(340); tr = 'cut'; }
+    if (tr === 'flash') { oneShot('flash'); tr = 'cut'; }
+    const run = (url) => {
+      if (P.bgCur !== nxt) return;
+      nxt.className = 'bg'; nxt.style.backgroundImage = `url('${url}')`;
+      nxt.style.zIndex = 1; cur.style.zIndex = 0; nxt.style.opacity = '1';
+      if (tr && tr !== 'cut') { void nxt.offsetWidth; nxt.classList.add('tr-' + tr); }
+      later(() => { if (P.bgCur === nxt) { cur.style.opacity = '0'; nxt.classList.remove('tr-' + tr); } }, tr === 'cut' ? 0 : 950);
+    };
+    if (l && l.bg) {
+      const im = new Image(); let done = false;
+      const go = (url) => { if (!done) { done = true; run(url); } };
+      im.onload = () => go(src); im.onerror = () => go(Art.background(l)); im.src = src;
+      later(() => go(src), 700); // не ждём медленную загрузку дольше 0,7 с
+    } else run(src);
   }
 
-  function renderSprites(st, speaker) {
+  // Спрайты: выход из-за края, уход, смена эмоции с наплывом, «подскок» говорящего
+  function renderSprites(st, speaker, fresh) {
     const { char, spriteSrc, blinkSrc } = A();
     const box = $('sprites'); const keep = new Set();
     Object.entries(st.stage).forEach(([cid, pos], idx) => {
-      const c = char(cid); if (!c) return; keep.add(cid);
+      const c = char(cid); if (!c || isNarrator(c)) return; keep.add(cid);
       const e = st.expr[cid] || 'default';
-      let w = box.querySelector(`[data-c="${cid}"]`);
-      if (!w) {
-        w = document.createElement('div'); w.className = 'spr gone'; w.dataset.c = cid;
-        w.innerHTML = `<img class="sticker" alt="${A().esc(c.name)}" style="animation-delay:-${(idx * 1.3).toFixed(1)}s">`;
-        box.appendChild(w); requestAnimationFrame(() => w.classList.remove('gone'));
+      const x = POS[pos] ?? (parseFloat(pos) || 50);
+      let w = box.querySelector(`[data-c="${cid}"]:not(.exit)`);
+      const isNew = !w;
+      if (isNew) {
+        w = document.createElement('div'); w.className = 'spr'; w.dataset.c = cid;
+        w.innerHTML = `<div class="spr-in"><img class="cur" alt="${A().esc(c.name)}" style="animation-delay:-${(idx * 1.3).toFixed(1)}s"></div>`;
+        w.style.setProperty('--from', (x < 50 ? -1 : 1) * 14 + 'cqw');
+        if (fresh) w.classList.add('enter');
+        box.appendChild(w);
+        if (fresh) { void w.offsetWidth; requestAnimationFrame(() => w.classList.remove('enter')); }
       }
-      const img = w.querySelector('img');
+      const img = w.querySelector('img.cur');
       const src = spriteSrc(c, e);
       if (img.dataset.src !== src) {
+        if (!isNew && img.dataset.src && fresh) {
+          const ghost = img.cloneNode(); ghost.className = img.className.replace('cur', '') + ' ghost'; ghost.removeAttribute('data-src');
+          img.parentNode.appendChild(ghost); later(() => ghost.remove(), 320);
+          const inr = w.querySelector('.spr-in'); inr.classList.remove('bump'); void inr.offsetWidth; inr.classList.add('bump');
+        }
         img.dataset.src = src; img.src = src;
-        img.onerror = () => { img.onerror = null; img.dataset.custom = ''; img.src = Art.sprite(c, e); img.dataset.blink = Art.sprite(c, e, { blink: true }); };
+        const cls = A().spriteCls(c, e); img.classList.toggle('own', cls === 'own'); img.classList.toggle('sticker', cls === 'sticker');
+        img.onerror = () => { img.onerror = null; img.classList.remove('own'); img.classList.add('sticker'); img.src = Art.sprite(c, e); img.dataset.blink = Art.sprite(c, e, { blink: true }); w.style.setProperty('--sk', (c.spriteScale || 1) * 0.66); w.style.setProperty('--y', (c.spriteY || 0) + 60); };
         img.dataset.blink = blinkSrc(c, e) || '';
         scheduleBlink(img);
       }
-      w.style.left = (POS[pos] ?? (parseFloat(pos) || 50)) + '%';
-      w.style.setProperty('--sk', c.spriteScale || 1);
-      w.style.setProperty('--y', c.spriteY || 0);
+      w.style.left = x + '%';
+      // Заглушки нарисованы по пояс — показываем их меньше и выше, чем настоящие спрайты в полный рост
+      const ph = (img.getAttribute('src') || '').startsWith('data:');
+      w.style.setProperty('--sk', (c.spriteScale || 1) * (ph ? 0.66 : 1));
+      w.style.setProperty('--y', (c.spriteY || 0) + (ph ? 60 : 0));
+      const wasSpeak = w.classList.contains('speak');
       w.classList.toggle('speak', cid === speaker);
-      w.classList.toggle('dim', !!speaker && cid !== speaker && speaker !== 'narrator');
+      if (fresh && cid === speaker && !wasSpeak && !isNew) { const inr = w.querySelector('.spr-in'); inr.classList.remove('hop'); void inr.offsetWidth; inr.classList.add('hop'); }
+      w.classList.toggle('dim', !!speaker && cid !== speaker && !isNarrator(char(speaker)));
       w.classList.toggle('glitchy', e === 'glitch');
-      w.classList.toggle('mirror', cid === 'narrator');
       w.classList.toggle('immune', !!c.immune || cid === 'stranger');
     });
-    box.querySelectorAll('.spr').forEach((w) => { if (!keep.has(w.dataset.c)) { w.classList.add('gone'); later(() => w.remove(), 450); } });
+    box.querySelectorAll('.spr:not(.exit)').forEach((w) => {
+      if (keep.has(w.dataset.c)) return;
+      if (!fresh) { w.remove(); return; }
+      const x = parseFloat(w.style.left) || 50;
+      w.style.setProperty('--from', (x < 50 ? -1 : 1) * 14 + 'cqw');
+      w.classList.add('exit'); later(() => w.remove(), 520);
+    });
   }
   function scheduleBlink(img) {
     clearTimeout(img._bt);
@@ -371,7 +508,8 @@
   }
 
   function rain(on) {
-    const cv = $('rain'); cv.hidden = !on; cancelAnimationFrame(P.rain); if (!on) return;
+    // Анимированный дождь отключён: он тормозил на слабых компьютерах
+    const cv = $('rain'); cv.hidden = true; cancelAnimationFrame(P.rain); return;
     const g = cv.getContext('2d'); cv.width = cv.clientWidth; cv.height = cv.clientHeight;
     const drops = Array.from({ length: 170 }, () => ({ x: Math.random() * cv.width, y: Math.random() * cv.height, v: 7 + Math.random() * 9 }));
     const tick = () => {
@@ -390,51 +528,71 @@
 
   function show(fresh) {
     if (!P) return;
-    const { ep } = P; const { char, ransom, esc, ytLink, store, S } = A();
+    const { ep } = P; const { ransom, S } = A();
     const sc = ep.scenes[P.si]; const ln = sc.lines[P.li];
     const stage = $('stage');
+    if (isCheck(ln)) return checkLine(ln.check, fresh);
     const st = stateAt(ep, P.si, P.li);
+    const nv = S.config.novel || {};
     $('p-sc').textContent = '· ' + sc.title;
     const sceneChanged = P.lastScene !== P.si; P.lastScene = P.si;
-    if (sceneChanged && fresh) staticBurst(260);
-    setBg(st.bg);
+    if (P.intro) P.intro.cancel();
+    const tr = !fresh ? 'cut' : (ln.bgT || (sceneChanged ? (sc.transition || nv.sceneTransition || 'halftone') : (nv.bgTransition || 'fade')));
+    setBg(st.bg, tr);
     PERSIST.forEach((f) => stage.classList.toggle('fx-' + f, !!st.fx[f]));
     rain(!!st.fx.rain);
-    renderSprites(st, ln.c);
-    if (fresh) oneShot(ln.fx);
     Sound.setMusic(st.music);
-    if (fresh && ln.sfx) Sound.sfx(ln.sfx);
 
     stage.querySelectorAll('.sc-card').forEach((x) => x.remove());
-    if (sceneChanged && fresh) {
+    // Начало сцены: сначала только фон и название, потом выходят персонажи и текст
+    if (sceneChanged && fresh && nv.sceneIntro !== false) {
+      renderSprites({ stage: {}, expr: {} }, null, true);
+      const box = $('box'); box.classList.add('away');
       const t = document.createElement('div'); t.className = 'sc-card';
       t.innerHTML = `<small>Сцена ${String(P.si + 1).padStart(2, '0')}</small>${ransom(sc.title)}`;
-      stage.appendChild(t); later(() => t.remove(), 2900);
+      stage.appendChild(t);
+      let over = false;
+      const fin = () => {
+        if (over) return; over = true; P.intro = null;
+        t.classList.add('out'); later(() => t.remove(), 450);
+        box.classList.remove('away');
+        showLine(st, sc, ln, true);
+      };
+      P.intro = { fin, cancel: () => { over = true; P.intro = null; t.remove(); $('box').classList.remove('away'); } };
+      later(fin, nv.sceneTitleMs || 1900);
+      return;
     }
+    showLine(st, sc, ln, fresh);
+  }
 
-    // плашка имени
-    const c = char(ln.c); const plate = $('plate');
-    if (c && (ln.say || ln.think)) {
-      plate.hidden = false; plate.style.setProperty('--c', c.color || '#efece2');
-      plate.innerHTML = ransom(c.short || c.name, { seed: c.id }) + (ln.think ? '<i>мысли</i>' : '');
-    } else plate.hidden = true;
+  function showLine(st, sc, ln, fresh) {
+    const { ep } = P; const { char, ransom, esc, ytLink, store, S } = A();
+    const stage = $('stage');
+    renderSprites(st, ln.c, fresh);
+    if (fresh) oneShot(ln.fx);
+    if (fresh && ln.sfx) Sound.sfx(ln.sfx);
+
+    // окно диалога: реплика — комиксовый пузырь, мысль — облачко, рассказчик — жёлтая плашка
+    const c0 = char(ln.c); const c = isNarrator(c0) ? null : c0;
+    const kind = c && ln.think ? 'think' : c && ln.say ? 'say' : 'narr';
+    const box = $('box'); box.className = 'box k-' + kind;
+    box.style.setProperty('--c', c ? (c.color || '#efece2') : '#f2d230');
+    const plate = $('plate');
+    if (c) { plate.hidden = false; plate.innerHTML = ransom(c.short || c.name, { seed: c.id }) + (kind === 'think' ? '<i>мысли</i>' : ''); }
+    else plate.hidden = true;
+    const tail = $('tail'); const pos = c && st.stage[c.id];
+    if (pos !== undefined) {
+      const x = POS[pos] ?? (parseFloat(pos) || 50);
+      tail.hidden = false; tail.style.left = Math.max(6, Math.min(94, (x - 2.5) / 95 * 100)) + '%';
+    } else tail.hidden = true;
 
     const tx = $('txt');
-    tx.className = 'txt ' + (ln.think ? 'think' : ln.say ? 'say' : 'narr');
-    if (c && ln.think) tx.style.setProperty('--c', c.color); else tx.style.removeProperty('--c');
-    type(tx, ln.think ? `«${ln.think}»` : lineStr(ln));
+    tx.className = 'txt ' + kind;
+    type(tx, lineStr(ln), !fresh);
 
-    // тихая пометка броска
-    const chip = $('chip'); const rolls = rollsBefore(sc, P.li);
-    if (P.set.rolls && rolls.length) {
-      chip.hidden = false;
-      chip.innerHTML = rolls.map((r) => `<span class="${r.success ? 'ok' : 'bad'}">${esc(r.stat)} ${esc(r.die)} · сл. ${esc(r.dc)}${r.result != null ? ' · ' + esc(r.result) : ''} · ${r.success ? 'успех' : 'провал'}</span>`).join('');
-      if (fresh) Sound.sfx(S.config.sounds && S.config.sounds.roll, 0.6);
-    } else chip.hidden = true;
+    $('tc').innerHTML = ln.t && ep.video ? `<a href="${ytLink(ep, ln.t)}" target="_blank" rel="noopener" title="Открыть этот момент в записи">▶ ${esc(ln.t)}</a>` : '';
 
-    $('tc').innerHTML = ln.t && ep.video ? `<a href="${ytLink(ep, ln.t)}" target="_blank" rel="noopener" title="Открыть этот момент в записи">▶ ${esc(ln.t)}</a>` : esc(ln.t || '');
-
-    if (ln.clue && fresh) {
+    if (ln.clue && fresh && !Case.checkedClues(ep).includes(ln.clue)) {
       const k = (ep.clues || []).find((x) => x.id === ln.clue);
       if (k) {
         const t = document.createElement('div'); t.className = 'toast'; t.style.cssText = A().torn('t' + k.id, 3, 6, 'tblr');
@@ -445,21 +603,92 @@
     }
     if (fresh) P.log.push({ c, ln });
     try { history.replaceState(null, '', `#play-${ep.id}-${sc.id}-${P.li}`); } catch (e) {}
-    store.set('progress:' + ep.id, JSON.stringify({ s: sc.id, l: P.li }));
+    if (!ep.isBonus) store.set('progress:' + ep.id, JSON.stringify({ s: sc.id, l: P.li }));
+    if (fresh && P.li === 0) { const sv = $('saved'); if (sv) { sv.classList.remove('on'); void sv.offsetWidth; sv.classList.add('on'); } }
   }
 
-  function type(el, text) {
+  function type(el, text, instant) {
     clearInterval(P.typing); clearTimeout(P.autoT);
     el.textContent = ''; let i = 0; $('nexti').style.visibility = 'hidden';
-    const done = () => { clearInterval(P.typing); P.typing = null; el.textContent = text; $('nexti').style.visibility = 'visible'; if (P.auto) P.autoT = later(next, 1500 + text.length * 28); };
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return done();
+    const done = () => { clearInterval(P.typing); P.typing = null; el.textContent = text; $('nexti').style.visibility = 'visible'; if (P.auto && !P.skip) P.autoT = later(next, 1500 + text.length * 28); };
+    P.finishType = done;
+    if (instant || P.skip || matchMedia('(prefers-reduced-motion: reduce)').matches) return done();
     P.typing = setInterval(() => { i += 2; el.textContent = text.slice(0, i); if (i >= text.length) done(); }, 22);
     P.finishType = done;
+  }
+
+  // ---------- Проверка зрителя: бросок за улику ----------
+  function advance() { if (!P) return; const n = nextPos(P.ep, P.si, P.li, 1); if (!n) return ending(); go(n[0], n[1], true); }
+  function clueToast(k, kind) {
+    const { ransom, esc } = A(); const t = document.createElement('div'); t.className = 'toast' + (kind === 'partial' ? ' partial' : '');
+    t.style.cssText = A().torn('t' + k.id, 3, 6, 'tblr');
+    t.innerHTML = `${ransom(kind === 'partial' ? 'Обрывок' : 'Улика', { seed: 'clue' + kind })}<b>${esc(k.name)}</b>`;
+    $('stage').appendChild(t); later(() => t.remove(), 3600);
+  }
+  function rollDie(n) { return 1 + Math.floor(Math.random() * n); }
+  function checkLine(ch, fresh) {
+    const { esc, ransom, S } = A(); const ep = P.ep;
+    const k = (ep.clues || []).find((x) => x.id === ch.clue) || { id: ch.clue, name: ch.clue, text: '' };
+    const st = Case.status(ep, k.id);
+    P.rolled = P.rolled || {};
+    // уже найдено, уже бросали в этом прохождении или едем назад — проходим мимо
+    if (!fresh || st === 'found' || P.rolled[k.id]) { if (fresh) later(advance, 0); return; }
+    if (!P.set.dice) { Case.mark(ep, k.id, 'auto'); clueToast(k, 'found'); P.rolled[k.id] = 1; later(advance, 0); return; }
+    setSkip(false); if (P.auto) { P.auto = false; $('b-auto').classList.remove('on'); $('qm').querySelector('[data-q=auto]').classList.remove('on'); }
+    const sides = parseInt(String(ch.die).replace(/\D/g, ''), 10) || 6;
+    const dc = +ch.dc || sides;
+    const el = overlay(`<div class="chk" style="${A().torn('chk' + k.id, 2, 4, 'tblr')}">
+        <div class="eyebrow">Проверка · ${esc(ch.stat || '')}</div>
+        <div class="chk-goal">${esc(ch.goal || 'Найти улику')}</div>
+        <div class="chk-row">
+          <div class="die" id="die"><span id="die-n">${esc(ch.die)}</span></div>
+          <div class="chk-info"><b>Сложность ${dc}</b><small>Выбросьте ${dc} или больше. Максимум на кубике — бросок «взрывается» и прибавляется ещё один.</small></div>
+        </div>
+        <div class="chk-res" id="chk-res"></div>
+        <div class="chk-btns" id="chk-btns"><button class="btn hot" data-a="roll">Бросить ${esc(ch.die)}</button></div>
+        <div class="chk-tok">Жетоны невзгод: <b id="tok">${Case.tokens()}</b></div>
+      </div>`, 'ov-check');
+    el.style.cursor = 'auto';
+    const btns = el.querySelector('#chk-btns'), res = el.querySelector('#chk-res'), dieN = el.querySelector('#die-n'), die = el.querySelector('#die');
+    let total = 0; const parts = [];
+    const finish = (kind) => {
+      P.rolled[k.id] = 1; Case.mark(ep, k.id, kind);
+      if (kind === 'found') { res.innerHTML = `<div class="ok">Успех! Улика в деле: <b>${esc(k.name)}</b></div><p>${esc(k.text)}</p>`; Sound.sfx(S.config.sounds && S.config.sounds.clue, 0.7); }
+      else { res.innerHTML = `<div class="bad">Улика ускользнула. +1 жетон невзгод</div><p>${esc(k.partial || 'В деле остался только обрывок: что-то важное мелькнуло и пропало.')}</p>`; }
+      el.querySelector('#tok').textContent = Case.tokens();
+      btns.innerHTML = `<button class="btn hot" data-a="go">Дальше ▶</button>`;
+    };
+    btns.addEventListener('click', async (e) => {
+      const b = e.target.closest('button'); if (!b) return; e.stopPropagation(); Sound.unlock();
+      const a = b.dataset.a;
+      if (a === 'go') { closeOverlay(); return advance(); }
+      if (a === 'roll') {
+        btns.innerHTML = ''; Sound.sfx(S.config.sounds && S.config.sounds.roll, 0.7);
+        let r;
+        do {
+          die.classList.remove('spin'); void die.offsetWidth; die.classList.add('spin');
+          for (let i = 0; i < 8; i++) { dieN.textContent = rollDie(sides); await wait(55); }
+          r = rollDie(sides); parts.push(r); total += r; dieN.textContent = r;
+          if (r === sides) { res.innerHTML = `<div class="boom">Взрыв! ${parts.join(' + ')} — бросаем ещё</div>`; await wait(700); }
+        } while (r === sides && P);
+        dieN.textContent = total;
+        const need = dc - total;
+        if (need <= 0) return finish('found');
+        const tk = Case.tokens();
+        res.innerHTML = `<div class="bad">${parts.length > 1 ? parts.join(' + ') + ' = ' : 'Выпало '}${total}. Не хватает ${need}.</div>`;
+        btns.innerHTML = (tk >= need ? `<button class="btn hot" data-a="spend">Потратить ${need} ${need === 1 ? 'жетон' : need < 5 ? 'жетона' : 'жетонов'}</button>` : '') + `<button class="btn ink" data-a="fail">Принять провал (+1 жетон)</button>`;
+        btns.dataset.need = need;
+      }
+      if (a === 'spend') { const need = +btns.dataset.need; Case.addTokens(-need); total += need; dieN.textContent = total; finish('found'); }
+      if (a === 'fail') { Case.addTokens(1); finish('partial'); }
+    });
+    el.querySelector('[data-a=roll]').focus();
   }
 
   function next() {
     if (!P || P.overlay || P.busy) return;
     clearTimeout(P.autoT);
+    if (P.intro) return P.intro.fin();
     if (P.typing) return P.finishType();
     const n = nextPos(P.ep, P.si, P.li, 1);
     if (!n) return ending();
@@ -475,8 +704,13 @@
   // ---------- Финал ----------
   async function ending() {
     const { ep } = P; const { ransom, esc, char, S, epList, ytLink, store, spriteSrc } = A();
+    if (ep.isBonus) {
+      setSkip(false); staticBurst();
+      overlay(`<div class="ending"><div class="end-in in"><div class="end-title">${ransom('Конец бонуса')}<small>${esc(ep.bonus.title || '')}</small></div><div class="btns" style="justify-content:center"><a class="btn hot" href="#bonus-${ep.id}">К бонусу</a><a class="btn ink" href="#ep-${ep.id}">К эпизоду</a></div></div></div>`, 'ov-end');
+      return;
+    }
     store.set('progress:' + ep.id, 'null');
-    P.auto = false; $('b-auto').classList.remove('on');
+    P.auto = false; $('b-auto').classList.remove('on'); setSkip(false); toggleHide(false);
     Sound.setMusic(ep.endMusic || (S.config.music && S.config.music.ending) || '');
     staticBurst();
 
@@ -491,15 +725,16 @@
     const steps = [];
     steps.push(`<div class="end-title">${ransom('Конец эпизода')}<small>${esc(ep.title)}</small></div>`);
     steps.push(`<div class="credits"><div class="end-h">${ransom('В ролях')}</div>
-      <div class="cr-row">${players.map((c) => `<div class="cr" style="--c:${esc(c.color)}"><img class="sticker" src="${esc(spriteSrc(c, 'default'))}" alt=""><b>${esc(c.name)}</b><small>${esc(c.player || '')}</small></div>`).join('')}</div>
+      <div class="cr-row">${players.map((c) => `<div class="cr" style="--c:${esc(c.color)}"><img class="${A().spriteCls(c, 'default')}" src="${esc(spriteSrc(c, 'default'))}" alt=""><b>${esc(c.name)}</b><small>${esc(c.player || '')}</small></div>`).join('')}</div>
       ${npcs.length ? `<p class="cr-npc">${npcs.map((c) => esc(c.name)).join(' · ')}<br><small>Все остальные роли: ${esc(S.config.gm)}</small></p>` : ''}
-      <p class="cr-gm">Ведущий — <b>${esc(S.config.gm)}</b> · ${esc(S.config.channel)}</p></div>`);
+      <p class="cr-gm">Ведущий — <b>${esc(S.config.gm)}</b> · ${esc(S.config.channel)}</p>
+      ${S.config.about && S.config.about.music ? `<p class="cr-npc"><small>Музыка — ${esc(S.config.about.music.name)}</small></p>` : ''}</div>`);
     steps.push(`<div class="summary"><div class="end-h">${ransom('Итоги')}</div>
       <div class="sum-grid">
-        <div><div class="eyebrow">Улики</div>${(ep.clues || []).map((k) => `<p>· ${esc(k.name)}</p>`).join('') || '<p class="muted">—</p>'}</div>
+        <div><div class="eyebrow">Дело ${Case.progress(ep).found}/${Case.progress(ep).total}</div>${caseList(ep)}</div>
         <div><div class="eyebrow">Встречены</div>${npcs.map((c) => `<p style="color:${esc(c.color)}">· ${esc(c.name)}</p>`).join('') || '<p class="muted">—</p>'}
-          ${rolls ? `<p class="muted mono">Бросков ${rolls} · успехов ${ok} · провалов ${rolls - ok}</p>` : ''}</div>
-      </div></div>`);
+          <p class="muted mono">Жетоны невзгод: ${Case.tokens()}</p></div>
+      </div>${bonusNote(ep)}</div>`);
     if (ep.teaser && (ep.teaser.lines || []).length) steps.push('TEASER');
     steps.push(`<div class="links">${ransom(nx ? 'Продолжение' : 'Продолжение следует')}<div class="btns">
       ${nx ? `<a class="btn hot" href="#play-${nx.id}">Эпизод ${esc(nx.number)}: ${esc(nx.title)}</a>` : ''}
@@ -533,6 +768,19 @@
     }
   }
 
+  function caseList(ep) {
+    const { esc } = A(); const ids = Case.checkedClues(ep);
+    if (!ids.length) return '<p class="muted">—</p>';
+    return ids.map((id) => { const k = (ep.clues || []).find((x) => x.id === id) || { name: id }; const s = Case.status(ep, id);
+      return s === 'found' ? `<p class="cl-found">● ${esc(k.name)}</p>` : s === 'auto' ? `<p class="cl-auto">○ ${esc(k.name)} <small>без кубиков</small></p>` : s === 'partial' ? `<p class="cl-part">◐ ${esc(k.name)} <small>обрывок</small></p>` : `<p class="cl-none">? ? ?</p>`; }).join('');
+  }
+  function bonusNote(ep) {
+    const { esc } = A(); if (!ep.bonus) return '';
+    if (Case.bonusOpen(ep)) return `<p class="bonus-note open">Дело раскрыто! Открыт бонус: <a href="#bonus-${ep.id}">${esc(ep.bonus.title || 'Бонус')} →</a></p>`;
+    const p = Case.progress(ep);
+    return `<p class="bonus-note">${p.auto ? 'Бонус открывается только тем, кто ищет улики сам: включите в ⚙ «Бросать кубики самому» и пройдите эпизод снова.' : `Найдите все улики (${p.found}/${p.total}), чтобы открыть бонус. Перепройдите эпизод — найденное сохранится.`}</p>`;
+  }
+
   // ---------- Панели ----------
   function closePanel() { if (P.panel) { P.panel.remove(); P.panel = null; } }
   function panel(kind) {
@@ -547,19 +795,21 @@
       el.querySelectorAll('.jump').forEach((b) => b.onclick = () => { closePanel(); const [a, c] = settle(ep, +b.dataset.i, 0); go(a, c, true); });
     }
     if (kind === 'clues') {
-      const seen = new Set(); ep.scenes.forEach((s, i) => s.lines.forEach((l, j) => { if (l.clue && (i < P.si || (i === P.si && j <= P.li))) seen.add(l.clue); }));
-      const list = (ep.clues || []).filter((k) => seen.has(k.id));
-      el.innerHTML = `<h3>Улики</h3>${list.map((k) => `<div class="log-item"><b>${esc(k.name)}</b><p>${esc(k.text)}</p></div>`).join('') || '<p class="muted">Пока ничего не найдено.</p>'}`;
+      const ids = Case.checkedClues(ep); const p = Case.progress(ep);
+      el.innerHTML = `<h3>Дело ${p.found}/${p.total}</h3><p class="muted">Жетоны невзгод: ${Case.tokens()}</p>` + (ids.map((id) => { const k = (ep.clues || []).find((x) => x.id === id) || { name: id, text: '' }; const st = Case.status(ep, id);
+        if (st === 'found' || st === 'auto') return `<div class="log-item"><b>${esc(k.name)}</b>${st === 'auto' ? ' <small class="muted">без кубиков</small>' : ''}<p>${esc(k.text)}</p></div>`;
+        if (st === 'partial') return `<div class="log-item"><b>${esc(k.name)}</b> <small class="muted">обрывок</small><p>${esc(k.partial || '')}</p></div>`;
+        return `<div class="log-item"><b>? ? ?</b><p class="muted">Ещё не найдено.</p></div>`; }).join('') || '<p class="muted">В этом эпизоде нет улик.</p>') + (ep.bonus ? `<p class="muted" style="margin-top:14px">${Case.bonusOpen(ep) ? `Бонус открыт: <a href="#bonus-${ep.id}">${esc(ep.bonus.title || 'Бонус')}</a>` : 'Соберите все улики, чтобы открыть бонус.'}</p>` : '');
     }
     if (kind === 'settings') {
       const s = P.set;
       el.innerHTML = `<h3>Настройки</h3>
         <label class="tg"><input type="checkbox" id="st-sound" ${s.sound ? 'checked' : ''}> Звук и музыка</label>
-        <label class="tg"><input type="checkbox" id="st-rolls" ${s.rolls ? 'checked' : ''}> Показывать броски кубиков</label>
+        <label class="tg"><input type="checkbox" id="st-dice" ${s.dice ? 'checked' : ''}> Бросать кубики самому <small class="muted">выкл. — улики выдаются сами, но бонус не откроется</small></label>
         <label class="tg"><input type="checkbox" id="st-intro" ${s.intro ? 'checked' : ''}> Заставка перед эпизодом</label>
         <p class="muted">Настройки сохраняются в этом браузере.</p>`;
       el.querySelector('#st-sound').onchange = (e) => { s.sound = e.target.checked; saveSettings(s); $('b-sound').textContent = s.sound ? 'Звук' : 'Без звука'; Sound.unlock(); Sound.mute(!s.sound); };
-      el.querySelector('#st-rolls').onchange = (e) => { s.rolls = e.target.checked; saveSettings(s); show(false); };
+      el.querySelector('#st-dice').onchange = (e) => { s.dice = e.target.checked; saveSettings(s); };
       el.querySelector('#st-intro').onchange = (e) => { s.intro = e.target.checked; saveSettings(s); };
     }
     $('stage').appendChild(el); P.panel = el;
