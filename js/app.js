@@ -286,10 +286,24 @@
         <div class="sc-txt"><b>${esc(sc.title)}</b><small>${esc((l || {}).name || '')}${ep.video && sc.t ? ' · ' + esc(sc.t) : ''}</small></div>
         ${ep.video && sc.t ? `<a class="tc" href="${ytLink(ep, sc.t)}" target="_blank" rel="noopener" title="Открыть момент в записи">▶ ${esc(sc.t)}</a>` : ''}
       </li>`; }).join('')}</ol>
-      ${(ep.clues || []).length ? `<h2 class="h2s">Улики</h2><div class="notes">${ep.clues.map((k, i) => note(k, i)).join('')}</div>` : ''}
+      ${(ep.clues || []).length ? `<h2 class="h2s">Дело</h2>${caseNotes(ep)}` : ''}
       ${rolls.length ? `<details class="rolls-wrap"><summary>Журнал бросков (${rolls.length})</summary><div class="table-x"><table class="rolls"><thead><tr><th>Время</th><th>Кто</th><th>Проверка</th><th>Итог</th><th>Зачем</th></tr></thead><tbody>
         ${rolls.map(({ l }) => { const r = l.roll, c = char(r.who); return `<tr><td class="mono">${ep.video && l.t ? `<a href="${ytLink(ep, l.t)}" target="_blank" rel="noopener">${esc(l.t)}</a>` : '—'}</td><td>${esc(c ? c.short || c.name : r.who)}</td><td class="mono">${esc(r.stat)} ${esc(r.die)} · сл. ${esc(r.dc)}${r.result != null ? ' · ' + r.result : ''}</td><td>${r.success ? 'успех' : 'провал'}${r.tokens ? ` <span class="muted">· ${esc(r.tokens)}</span>` : ''}</td><td class="muted">${esc(r.note || '')}</td></tr>`; }).join('')}
       </tbody></table></div></details>` : ''}`);
+  }
+
+  // Улики показываются только когда зритель их нашёл (в новелле); остальные — «? ? ?»
+  function clueStatus(ep, k) {
+    const st = window.Case ? Case.status(ep, k.id) : 'found';
+    return st || '';
+  }
+  function caseNotes(ep, linkFor) {
+    return `<div class="notes">${(ep.clues || []).map((k, i) => {
+      const st = clueStatus(ep, k);
+      if (st === 'found' || st === 'auto') return note(k, i, linkFor ? linkFor(k) : '');
+      if (st === 'partial') return note({ id: k.id, name: k.name, text: k.partial || 'Остался только обрывок.' }, i, '<small class="note-tag">обрывок · можно перебросить при новом прохождении</small>');
+      return `<div class="note note-locked" style="${torn('k' + k.id, 2, 5, 'tblr')}"><b>? ? ?</b><p>Улика ещё не найдена. Пройдите эпизод, чтобы открыть её.</p></div>`;
+    }).join('')}</div>`;
   }
 
   function note(k, i, extra = '') {
@@ -336,10 +350,11 @@
   function clues() {
     const blocks = epList().filter((ep) => (ep.clues || []).length).map((ep) => {
       const where = {};
-      ep.scenes.forEach((sc) => sc.lines.forEach((l, li) => { if (l.clue && !where[l.clue]) where[l.clue] = { sc, li, t: l.t }; }));
-      return `<h2 class="h2s">${esc(ep.title)}</h2><div class="notes">${ep.clues.map((k, i) => { const w = where[k.id]; return note(k, i, w ? `<a class="mono" href="#play-${ep.id}-${w.sc.id}-${w.li}">${esc(w.sc.title)}${w.t ? ' · ' + esc(w.t) : ''} →</a>` : ''); }).join('')}</div>`;
+      ep.scenes.forEach((sc) => sc.lines.forEach((l, li) => { const id = l.clue || (l.check && l.check.clue); if (id && !where[id]) where[id] = { sc, li }; }));
+      const p = window.Case ? Case.progress(ep) : { found: 0, total: 0 };
+      return `<h2 class="h2s">${esc(ep.title)} · дело ${p.found}/${p.total}</h2>${caseNotes(ep, (k) => { const w = where[k.id]; return w ? `<a class="mono" href="#play-${ep.id}-${w.sc.id}">${esc(w.sc.title)} →</a>` : ''; })}`;
     }).join('');
-    shell('clues', `${head('Расследование', 'Улики', 'Предметы, снимки и странности, которые всплыли в игре.')}${blocks || '<p class="muted">Пока пусто.</p>'}`);
+    shell('clues', `${head('Расследование', 'Улики', 'Здесь собирается ваше дело: улики появляются, когда вы находите их в эпизодах.')}${blocks || '<p class="muted">Пока пусто.</p>'}`);
   }
 
   function world() {
@@ -418,7 +433,17 @@
   }
   window.addEventListener('hashchange', route);
 
-  window.App = { S, bgStyle, spriteCls, store, esc, char, loc, ytLink, epList, lineText, spriteSrc, blinkSrc, bgSrc, ransom, torn, pad2, root: $app };
+  // Уровень эффектов из настроек плеера: all / soft / off
+  function applyFx() {
+    let fx = 'all';
+    try { fx = (JSON.parse(localStorage.getItem('corpsman:settings') || '{}').fx) || 'all'; } catch (e) {}
+    const h = document.documentElement;
+    h.classList.toggle('fx-soft', fx === 'soft');
+    h.classList.toggle('fx-off', fx === 'off');
+  }
+  applyFx();
+
+  window.App = { applyFx, S, bgStyle, spriteCls, store, esc, char, loc, ytLink, epList, lineText, spriteSrc, blinkSrc, bgSrc, ransom, torn, pad2, root: $app };
   load().then(() => { if (window.Music) Music.init(S.config); route(); }).catch((e) => {
     $app.innerHTML = `<main class="wrap">${'<h1>Не загрузились данные</h1>'}<p class="lead">${esc(e.message)}</p>
       <p class="muted">Если вы открыли index.html двойным щелчком, браузер не даёт читать файлы с диска. Запустите в папке проекта <code>python -m http.server</code> и откройте http://localhost:8000, или смотрите сайт на GitHub Pages.</p></main>`;

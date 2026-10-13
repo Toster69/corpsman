@@ -8,7 +8,7 @@
 
   // ---------- Настройки ----------
   const SET_KEY = 'corpsman:settings';
-  function settings() { try { return Object.assign({ sound: true, dice: true, intro: true, speed: 1 }, JSON.parse(A().store.get(SET_KEY) || '{}')); } catch (e) { return { sound: true, dice: true, intro: true, speed: 1 }; } }
+  function settings() { try { return Object.assign({ sound: true, dice: true, intro: true, speed: 1, fx: 'all' }, JSON.parse(A().store.get(SET_KEY) || '{}')); } catch (e) { return { sound: true, dice: true, intro: true, speed: 1 }; } }
   function saveSettings(s) { A().store.set(SET_KEY, JSON.stringify(s)); }
 
   // ---------- Звук ----------
@@ -272,6 +272,7 @@
     });
   }
   function staticBurst(ms = 320) {
+    return; // помехи («статика») отключены полностью
     const s = $('static'); if (!s) return;
     s.classList.remove('on'); void s.offsetWidth; s.classList.add('on');
     Sound.staticBurst(ms);
@@ -292,7 +293,6 @@
         <div class="start-in">
           <div class="eyebrow">Эпизод ${esc(String(ep.number).padStart(2, '0'))}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
           <div class="start-title">${ransom(ep.title)}</div>
-          <div class="press">PRESS START</div>
           <div class="menu" role="menu">
             ${sc ? `<button class="mi" data-go="resume" role="menuitem"><span>▶</span> Продолжить <small>сохранение: ${esc(sc.title)}</small></button>` : ''}
             <button class="mi" data-go="start" role="menuitem"><span>▶</span> Новая игра</button>
@@ -427,7 +427,7 @@
     const b1 = $('bg1'), b2 = $('bg2');
     const cur = P.bgCur || b1, nxt = cur === b1 ? b2 : b1;
     const first = !P.bgCur; P.bgCur = nxt;
-    if (first || matchMedia('(prefers-reduced-motion: reduce)').matches) tr = 'cut';
+    if (first || document.documentElement.classList.contains('fx-off')) tr = 'cut';
     if (tr === 'static') { staticBurst(340); tr = 'cut'; }
     if (tr === 'flash') { oneShot('flash'); tr = 'cut'; }
     const run = (url) => {
@@ -537,29 +537,36 @@
     $('p-sc').textContent = '· ' + sc.title;
     const sceneChanged = P.lastScene !== P.si; P.lastScene = P.si;
     if (P.intro) P.intro.cancel();
-    const tr = !fresh ? 'cut' : (ln.bgT || (sceneChanged ? (sc.transition || nv.sceneTransition || 'halftone') : (nv.bgTransition || 'fade')));
+    const lvl = sceneChanged && fresh && nv.sceneIntro !== false;
+    const tr = !fresh || lvl ? 'cut' : (ln.bgT || (sceneChanged ? (sc.transition || nv.sceneTransition || 'halftone') : (nv.bgTransition || 'fade')));
     setBg(st.bg, tr);
     PERSIST.forEach((f) => stage.classList.toggle('fx-' + f, !!st.fx[f]));
     rain(!!st.fx.rain);
     Sound.setMusic(st.music);
 
-    stage.querySelectorAll('.sc-card').forEach((x) => x.remove());
+    stage.querySelectorAll('.sc-card, .lvl').forEach((x) => x.remove());
     // Начало сцены: сначала только фон и название, потом выходят персонажи и текст
     if (sceneChanged && fresh && nv.sceneIntro !== false) {
       renderSprites({ stage: {}, expr: {} }, null, true);
       const box = $('box'); box.classList.add('away');
-      const t = document.createElement('div'); t.className = 'sc-card';
-      t.innerHTML = `<small>Сцена ${String(P.si + 1).padStart(2, '0')}</small>${ransom(sc.title)}`;
+      const L = A().loc(st.bg); const ms = nv.sceneTitleMs || 2400;
+      const t = document.createElement('div'); t.className = 'lvl';
+      t.innerHTML = `<div class="lvl-in" style="--ms:${ms}ms">
+        <div class="lvl-no">ГЛАВА <b>${String(P.si + 1).padStart(2, '0')}</b><span>/ ${String(ep.scenes.length).padStart(2, '0')}</span></div>
+        <div class="lvl-title">${ransom(sc.title)}</div>
+        ${L ? `<div class="lvl-loc">${A().esc(L.name)}</div>` : ''}
+        <div class="lvl-bar"><i></i></div>
+        <div class="lvl-hint">● Сохранено · клик — продолжить</div></div>`;
       stage.appendChild(t);
       let over = false;
       const fin = () => {
         if (over) return; over = true; P.intro = null;
-        t.classList.add('out'); later(() => t.remove(), 450);
+        t.classList.add('out'); later(() => t.remove(), 600);
         box.classList.remove('away');
         showLine(st, sc, ln, true);
       };
       P.intro = { fin, cancel: () => { over = true; P.intro = null; t.remove(); $('box').classList.remove('away'); } };
-      later(fin, nv.sceneTitleMs || 1900);
+      later(fin, ms);
       return;
     }
     showLine(st, sc, ln, fresh);
@@ -595,6 +602,7 @@
     if (ln.clue && fresh && !Case.checkedClues(ep).includes(ln.clue)) {
       const k = (ep.clues || []).find((x) => x.id === ln.clue);
       if (k) {
+        Case.mark(ep, k.id, 'found');
         const t = document.createElement('div'); t.className = 'toast'; t.style.cssText = A().torn('t' + k.id, 3, 6, 'tblr');
         t.innerHTML = `${ransom('Улика', { seed: 'clue' })}<b>${esc(k.name)}</b>`;
         stage.appendChild(t); later(() => t.remove(), 3600);
@@ -612,7 +620,7 @@
     el.textContent = ''; let i = 0; $('nexti').style.visibility = 'hidden';
     const done = () => { clearInterval(P.typing); P.typing = null; el.textContent = text; $('nexti').style.visibility = 'visible'; if (P.auto && !P.skip) P.autoT = later(next, 1500 + text.length * 28); };
     P.finishType = done;
-    if (instant || P.skip || matchMedia('(prefers-reduced-motion: reduce)').matches) return done();
+    if (instant || P.skip || document.documentElement.classList.contains('fx-off')) return done();
     P.typing = setInterval(() => { i += 2; el.textContent = text.slice(0, i); if (i >= text.length) done(); }, 22);
     P.finishType = done;
   }
@@ -646,7 +654,7 @@
         </div>
         <div class="chk-res" id="chk-res"></div>
         <div class="chk-btns" id="chk-btns"><button class="btn hot" data-a="roll">Бросить ${esc(ch.die)}</button></div>
-        <div class="chk-tok">Жетоны невзгод: <b id="tok">${Case.tokens()}</b></div>
+        <div class="chk-tok">Жетоны неудачи: <b id="tok">${Case.tokens()}</b></div>
       </div>`, 'ov-check');
     el.style.cursor = 'auto';
     const btns = el.querySelector('#chk-btns'), res = el.querySelector('#chk-res'), dieN = el.querySelector('#die-n'), die = el.querySelector('#die');
@@ -654,7 +662,7 @@
     const finish = (kind) => {
       P.rolled[k.id] = 1; Case.mark(ep, k.id, kind);
       if (kind === 'found') { res.innerHTML = `<div class="ok">Успех! Улика в деле: <b>${esc(k.name)}</b></div><p>${esc(k.text)}</p>`; Sound.sfx(S.config.sounds && S.config.sounds.clue, 0.7); }
-      else { res.innerHTML = `<div class="bad">Улика ускользнула. +1 жетон невзгод</div><p>${esc(k.partial || 'В деле остался только обрывок: что-то важное мелькнуло и пропало.')}</p>`; }
+      else { res.innerHTML = `<div class="bad">Улика ускользнула. +1 жетон неудачи</div><p>${esc(k.partial || 'В деле остался только обрывок: что-то важное мелькнуло и пропало.')}</p>`; }
       el.querySelector('#tok').textContent = Case.tokens();
       btns.innerHTML = `<button class="btn hot" data-a="go">Дальше ▶</button>`;
     };
@@ -733,7 +741,7 @@
       <div class="sum-grid">
         <div><div class="eyebrow">Дело ${Case.progress(ep).found}/${Case.progress(ep).total}</div>${caseList(ep)}</div>
         <div><div class="eyebrow">Встречены</div>${npcs.map((c) => `<p style="color:${esc(c.color)}">· ${esc(c.name)}</p>`).join('') || '<p class="muted">—</p>'}
-          <p class="muted mono">Жетоны невзгод: ${Case.tokens()}</p></div>
+          <p class="muted mono">Жетоны неудачи: ${Case.tokens()}</p></div>
       </div>${bonusNote(ep)}</div>`);
     if (ep.teaser && (ep.teaser.lines || []).length) steps.push('TEASER');
     steps.push(`<div class="links">${ransom(nx ? 'Продолжение' : 'Продолжение следует')}<div class="btns">
@@ -796,7 +804,7 @@
     }
     if (kind === 'clues') {
       const ids = Case.checkedClues(ep); const p = Case.progress(ep);
-      el.innerHTML = `<h3>Дело ${p.found}/${p.total}</h3><p class="muted">Жетоны невзгод: ${Case.tokens()}</p>` + (ids.map((id) => { const k = (ep.clues || []).find((x) => x.id === id) || { name: id, text: '' }; const st = Case.status(ep, id);
+      el.innerHTML = `<h3>Дело ${p.found}/${p.total}</h3><p class="muted">Жетоны неудачи: ${Case.tokens()}</p>` + (ids.map((id) => { const k = (ep.clues || []).find((x) => x.id === id) || { name: id, text: '' }; const st = Case.status(ep, id);
         if (st === 'found' || st === 'auto') return `<div class="log-item"><b>${esc(k.name)}</b>${st === 'auto' ? ' <small class="muted">без кубиков</small>' : ''}<p>${esc(k.text)}</p></div>`;
         if (st === 'partial') return `<div class="log-item"><b>${esc(k.name)}</b> <small class="muted">обрывок</small><p>${esc(k.partial || '')}</p></div>`;
         return `<div class="log-item"><b>? ? ?</b><p class="muted">Ещё не найдено.</p></div>`; }).join('') || '<p class="muted">В этом эпизоде нет улик.</p>') + (ep.bonus ? `<p class="muted" style="margin-top:14px">${Case.bonusOpen(ep) ? `Бонус открыт: <a href="#bonus-${ep.id}">${esc(ep.bonus.title || 'Бонус')}</a>` : 'Соберите все улики, чтобы открыть бонус.'}</p>` : '');
@@ -807,10 +815,16 @@
         <label class="tg"><input type="checkbox" id="st-sound" ${s.sound ? 'checked' : ''}> Звук и музыка</label>
         <label class="tg"><input type="checkbox" id="st-dice" ${s.dice ? 'checked' : ''}> Бросать кубики самому <small class="muted">выкл. — улики выдаются сами, но бонус не откроется</small></label>
         <label class="tg"><input type="checkbox" id="st-intro" ${s.intro ? 'checked' : ''}> Заставка перед эпизодом</label>
+        <label class="tg tg-sel">Эффекты <select id="st-fx">
+          <option value="all" ${(s.fx || 'all') === 'all' ? 'selected' : ''}>Все</option>
+          <option value="soft" ${s.fx === 'soft' ? 'selected' : ''}>Мягкие — без вспышек и тряски</option>
+          <option value="off" ${s.fx === 'off' ? 'selected' : ''}>Выключить анимацию</option>
+        </select></label>
         <p class="muted">Настройки сохраняются в этом браузере.</p>`;
       el.querySelector('#st-sound').onchange = (e) => { s.sound = e.target.checked; saveSettings(s); $('b-sound').textContent = s.sound ? 'Звук' : 'Без звука'; Sound.unlock(); Sound.mute(!s.sound); };
       el.querySelector('#st-dice').onchange = (e) => { s.dice = e.target.checked; saveSettings(s); };
       el.querySelector('#st-intro').onchange = (e) => { s.intro = e.target.checked; saveSettings(s); };
+      el.querySelector('#st-fx').onchange = (e) => { s.fx = e.target.value; saveSettings(s); if (window.App && App.applyFx) App.applyFx(); };
     }
     $('stage').appendChild(el); P.panel = el;
   }
