@@ -4,6 +4,19 @@
   const A = () => window.App;
   const PERSIST = ['negative', 'rain', 'vhs', 'film', 'mirror'];
   const POS = { farleft: 13, left: 26, center: 50, right: 74, farright: 87 };
+  // Авто-раскладка: персонажи расходятся по сцене в зависимости от их количества,
+  // порядок слева направо берётся из указанных позиций (left / center / right…)
+  const SLOTS = { 1: [50], 2: [30, 70], 3: [20, 50, 80], 4: [14, 38, 62, 86], 5: [12, 31, 50, 69, 88] };
+  function layout(stage) {
+    const { char } = A();
+    const ids = Object.keys(stage).filter((id) => { const c = char(id); return c && !isNarrator(c); });
+    const raw = (id) => POS[stage[id]] ?? (parseFloat(stage[id]) || 50);
+    const nv = A().S.config.novel || {}; const auto = nv.autoLayout !== false;
+    const out = {};
+    if (!auto || !SLOTS[ids.length]) { ids.forEach((id) => { out[id] = raw(id); }); return out; }
+    ids.slice().sort((a, b) => raw(a) - raw(b)).forEach((id, i) => { out[id] = SLOTS[ids.length][i]; });
+    return out;
+  }
   let P = null; // текущее состояние плеера
 
   // ---------- Настройки ----------
@@ -16,16 +29,36 @@
     ctx: null, music: null, cur: '', vol: 0.55,
     unlock() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === 'suspended') this.ctx.resume(); } catch (e) {} },
     on() { return P && P.set.sound; },
-    setMusic(src) {
-      src = src && src !== 'none' ? src : '';
-      if (src === this.cur) return;
-      this.cur = src;
-      if (src && window.Music) { const t = Music.unlockBySrc(src); if (t && P) trackToast(t); }
+    // Трек можно указать путём к файлу или id из config.json → tracks.
+    // Если файла нет, играет запасной трек ("fallback"), а сам трек не открывается в кассете.
+    resolve(ref) {
+      const tracks = (A().S.config.tracks || []);
+      const norm = (x) => String(x || '').replace(/^\.?\//, '');
+      const t = tracks.find((x) => x.id === ref) || tracks.find((x) => norm(x.src) === norm(ref));
+      return { src: t ? t.src : ref, track: t || null };
+    },
+    setMusic(ref) {
+      ref = ref && ref !== 'none' ? ref : '';
+      if (ref === this.cur) return;
+      this.cur = ref;
       const old = this.music; this.music = null;
       if (old) this.fade(old, 0, 900, () => { old.pause(); });
-      if (!src) return;
-      const a = new Audio(src); a.loop = true; a.volume = 0; this.music = a;
-      if (this.on()) a.play().then(() => this.fade(a, this.vol, 1400)).catch(() => {});
+      if (!ref) return;
+      let { src, track } = this.resolve(ref);
+      const tried = new Set();
+      const a = new Audio(); a.loop = true; a.volume = 0; this.music = a;
+      const start = () => {
+        tried.add(src); a.src = src;
+        if (this.on() && this.music === a) a.play().then(() => this.fade(a, this.vol, 1400)).catch(() => {});
+      };
+      a.addEventListener('error', () => {
+        const fb = track && track.fallback && this.resolve(track.fallback);
+        if (fb && !tried.has(fb.src)) { src = fb.src; track = fb.track; start(); }
+      });
+      a.addEventListener('canplay', () => {
+        if (window.Music) { const t = Music.unlockBySrc(src); if (t && P) trackToast(t); }
+      }, { once: true });
+      start();
     },
     fade(a, to, ms, done) {
       const from = a.volume, t0 = performance.now();
@@ -114,7 +147,7 @@
     root.innerHTML = `
       <div class="p-bar">
         <a href="#ep-${ep.id}" class="pb" title="Выйти (Esc)" aria-label="Выйти">✕</a>
-        <span class="p-title"><b>${esc(String(ep.number).padStart(2, '0'))}</b> ${esc(ep.title)} <span id="p-sc"></span><i class="saved" id="saved">● Сохранено</i></span>
+        <span class="p-title"><b>${esc(A().epNo(ep))}</b> ${esc(ep.title)} <span id="p-sc"></span><i class="saved" id="saved">● Сохранено</i></span>
         <button class="pb" id="b-back" title="Назад (←)" aria-label="Назад">◀</button>
         <button class="pb" id="b-auto" title="Автопрокрутка">Авто</button>
         <button class="pb" id="b-sound" title="Звук">${set.sound ? 'Звук' : 'Без звука'}</button>
@@ -291,7 +324,7 @@
         <div class="layer ht-layer"></div>
         <img class="start-logo" src="${esc(logo)}" alt="" onerror="this.remove()">
         <div class="start-in">
-          <div class="eyebrow">Эпизод ${esc(String(ep.number).padStart(2, '0'))}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
+          <div class="eyebrow">Эпизод ${esc(A().epNo(ep))}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
           <div class="start-title">${ransom(ep.title)}</div>
           <div class="menu" role="menu">
             ${sc ? `<button class="mi" data-go="resume" role="menuitem"><span>▶</span> Продолжить <small>сохранение: ${esc(sc.title)}</small></button>` : ''}
@@ -324,7 +357,7 @@
 
   // «Загрузка картриджа»
   function loading() {
-    const el = overlay(`<div class="loading"><div class="ld-txt">ЗАГРУЗКА<span class="ld-dots"></span></div><div class="ld-bar"><i></i></div><div class="ld-slot">СЛОТ ${String(P.ep.number).padStart(2, '0')} · ${A().esc(P.ep.title)}</div></div>`, 'ov-load');
+    const el = overlay(`<div class="loading"><div class="ld-txt">ЗАГРУЗКА<span class="ld-dots"></span></div><div class="ld-bar"><i></i></div><div class="ld-slot">СЛОТ ${A().epNo(P.ep)} · ${A().esc(P.ep.title)}</div></div>`, 'ov-load');
     return waitOverlay(el, 1500).then(() => { if (P) closeOverlay(); });
   }
   // Предупреждение перед игрой (config.warning)
@@ -378,7 +411,7 @@
     prev.scenes.forEach((sc, si) => sc.lines.forEach((l, li) => {
       if (!l.recap) return;
       const st = stateAt(prev, si, li);
-      items.push({ c: l.c, text: lineStr(l), bg: st.bg, e: l.c ? st.expr[l.c] : null });
+      items.push({ c: l.c, text: lineStr(l), bg: st.bg, e: l.c ? st.expr[l.c] : null, music: st.music });
     }));
     return items;
   }
@@ -395,12 +428,20 @@
     el.querySelector('.skip').onclick = (e) => { e.stopPropagation(); skipped = true; };
     let tap = null; el.addEventListener('click', () => { if (tap) tap(); });
     staticBurst();
+    // Музыка заставки: config.music.recap, иначе музыка первого момента, иначе «мистика»
+    Sound.setMusic((S.config.music && S.config.music.recap) || items[0].music || 'mystery');
     await wait(1600);
     for (const it of items) {
       if (skipped || !P) break;
       const c = it.c && char(it.c);
       $('rc-bg').style.backgroundImage = `url('${A().bgSrc(loc(it.bg))}')`;
       $('rc-spr').innerHTML = c ? `<img class="${A().spriteCls(c, it.e || 'default')}" src="${esc(spriteSrc(c, it.e || 'default'))}" alt="">` : '';
+      const rimg = $('rc-spr').querySelector('img');
+      if (rimg) {
+        const mark = () => $('rc-spr').classList.toggle('ph', (rimg.getAttribute('src') || '').startsWith('data:'));
+        rimg.onerror = () => { rimg.onerror = null; rimg.src = Art.sprite(c, it.e || 'default'); mark(); };
+        mark();
+      }
       $('rc-cap').innerHTML = `${c ? `<b style="color:${esc(c.color)}">${esc(c.short || c.name)}</b> ` : ''}${esc(it.text)}`;
       el.querySelector('.recap').classList.remove('cut'); void el.offsetWidth; el.querySelector('.recap').classList.add('cut');
       await new Promise((r) => { tap = r; later(r, 3000); });
@@ -412,7 +453,7 @@
     const { ransom, S, esc } = A();
     const logo = S.config.logo || 'assets/brand/logo.webp';
     staticBurst();
-    const el = overlay(`<div class="tcard"><img class="tc-logo" src="${esc(logo)}" alt="" onerror="this.remove()"><div class="eyebrow">Эпизод ${esc(P.ep.number)}</div><div class="tc-title">${ransom(P.ep.title)}</div></div>`, 'ov-title');
+    const el = overlay(`<div class="tcard"><img class="tc-logo" src="${esc(logo)}" alt="" onerror="this.remove()"><div class="eyebrow">Эпизод ${esc(A().epNo(P.ep))}</div><div class="tc-title">${ransom(P.ep.title)}</div></div>`, 'ov-title');
     return waitOverlay(el, 3600).then(() => { if (P) { closeOverlay(); staticBurst(); } });
   }
 
@@ -448,11 +489,11 @@
   // Спрайты: выход из-за края, уход, смена эмоции с наплывом, «подскок» говорящего
   function renderSprites(st, speaker, fresh) {
     const { char, spriteSrc, blinkSrc } = A();
-    const box = $('sprites'); const keep = new Set();
+    const box = $('sprites'); const keep = new Set(); const lay = layout(st.stage);
     Object.entries(st.stage).forEach(([cid, pos], idx) => {
       const c = char(cid); if (!c || isNarrator(c)) return; keep.add(cid);
       const e = st.expr[cid] || 'default';
-      const x = POS[pos] ?? (parseFloat(pos) || 50);
+      const x = lay[cid] ?? 50;
       let w = box.querySelector(`[data-c="${cid}"]:not(.exit)`);
       const isNew = !w;
       if (isNew) {
@@ -589,7 +630,7 @@
     else plate.hidden = true;
     const tail = $('tail'); const pos = c && st.stage[c.id];
     if (pos !== undefined) {
-      const x = POS[pos] ?? (parseFloat(pos) || 50);
+      const x = layout(st.stage)[c.id] ?? 50;
       tail.hidden = false; tail.style.left = Math.max(6, Math.min(94, (x - 2.5) / 95 * 100)) + '%';
     } else tail.hidden = true;
 
@@ -717,7 +758,7 @@
       overlay(`<div class="ending"><div class="end-in in"><div class="end-title">${ransom('Конец бонуса')}<small>${esc(ep.bonus.title || '')}</small></div><div class="btns" style="justify-content:center"><a class="btn hot" href="#bonus-${ep.id}">К бонусу</a><a class="btn ink" href="#ep-${ep.id}">К эпизоду</a></div></div></div>`, 'ov-end');
       return;
     }
-    store.set('progress:' + ep.id, 'null');
+    store.set('progress:' + ep.id, 'null'); store.set('done:' + ep.id, '1');
     P.auto = false; $('b-auto').classList.remove('on'); setSkip(false); toggleHide(false);
     Sound.setMusic(ep.endMusic || (S.config.music && S.config.music.ending) || '');
     staticBurst();
@@ -745,7 +786,7 @@
       </div>${bonusNote(ep)}</div>`);
     if (ep.teaser && (ep.teaser.lines || []).length) steps.push('TEASER');
     steps.push(`<div class="links">${ransom(nx ? 'Продолжение' : 'Продолжение следует')}<div class="btns">
-      ${nx ? `<a class="btn hot" href="#play-${nx.id}">Эпизод ${esc(nx.number)}: ${esc(nx.title)}</a>` : ''}
+      ${nx ? `<a class="btn hot" href="#play-${nx.id}">Эпизод ${esc(A().epNo(nx))}: ${esc(nx.title)}</a>` : ''}
       ${ep.video ? `<a class="btn" href="${ytLink(ep)}" target="_blank" rel="noopener">Полная запись</a>` : ''}
       <a class="btn ink" href="#ep-${ep.id}">К эпизоду</a><a class="btn ink" href="#">На главную</a></div></div>`);
 
@@ -820,11 +861,21 @@
           <option value="soft" ${s.fx === 'soft' ? 'selected' : ''}>Мягкие — без вспышек и тряски</option>
           <option value="off" ${s.fx === 'off' ? 'selected' : ''}>Выключить анимацию</option>
         </select></label>
-        <p class="muted">Настройки сохраняются в этом браузере.</p>`;
+        <p class="muted">Настройки сохраняются в этом браузере.</p>
+        <button class="btn ink" type="button" id="st-reset">Сбросить прогресс</button>
+        <small class="muted" style="display:block;margin-top:6px">Удалит сохранения, найденные улики, жетоны, открытые треки и бонусы — сайт откроется как в первый раз.</small>`;
       el.querySelector('#st-sound').onchange = (e) => { s.sound = e.target.checked; saveSettings(s); $('b-sound').textContent = s.sound ? 'Звук' : 'Без звука'; Sound.unlock(); Sound.mute(!s.sound); };
       el.querySelector('#st-dice').onchange = (e) => { s.dice = e.target.checked; saveSettings(s); };
       el.querySelector('#st-intro').onchange = (e) => { s.intro = e.target.checked; saveSettings(s); };
       el.querySelector('#st-fx').onchange = (e) => { s.fx = e.target.value; saveSettings(s); if (window.App && App.applyFx) App.applyFx(); };
+      el.querySelector('#st-reset').onclick = () => {
+        if (!confirm('Сбросить весь прогресс? Сохранения, улики, жетоны, треки и бонусы будут удалены.')) return;
+        try {
+          const keys = []; for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+          keys.filter((k) => /^(corpsman:|case:|bonus:|progress:|done:)/.test(k)).forEach((k) => localStorage.removeItem(k));
+        } catch (e) {}
+        location.hash = '#'; location.reload();
+      };
     }
     $('stage').appendChild(el); P.panel = el;
   }

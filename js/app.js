@@ -16,6 +16,8 @@
   const epList = () => (S.config.episodes || []).map((id) => S.eps[id]).filter(Boolean);
   const lineText = (ln) => ln.say || ln.think || ln.n || (ln.roll ? `${ln.roll.stat} ${ln.roll.die}, сложность ${ln.roll.dc}` : '');
   const pad2 = (n) => String(n ?? '').padStart(2, '0');
+  // Номер эпизода для показа: код из JSON (A0, A1-1…) или номер с нулём
+  const epNo = (ep) => (ep && ep.code) || pad2(ep && ep.number);
 
   // ---------- Картинки ----------
   function spriteSrc(c, e) { if (!c) return ''; const sp = c.sprites || {}; return sp[e] || sp.default || Art.sprite(c, e); }
@@ -162,20 +164,97 @@
         <span>Пересказ игр канала <a href="#channel">${esc(S.config.channel)}</a> · ведущий ${esc(S.config.gm)}</span>
       </div></footer>`;
     window.scrollTo(0, 0);
+    if (document.getElementById('tree')) { requestAnimationFrame(drawTree); setTimeout(drawTree, 400); if (document.fonts) document.fonts.ready.then(drawTree); }
     const mb = document.getElementById('music-btn');
     if (mb) { mb.onclick = (e) => { e.stopPropagation(); SiteMusic.toggle(); }; SiteMusic.paint(); }
   }
   const head = (eyebrow, title, lead) => `<header class="page-head"><div class="eyebrow">${esc(eyebrow)}</div><h1>${ransom(title)}</h1>${lead ? `<p class="lead">${esc(lead)}</p>` : ''}</header>`;
+
+
+  // ---------- Древо эпизодов ----------
+  // Каждый эпизод живёт на своей линии ("line": "A", "B"…) и продолжает другой ("after": "ep000").
+  // Линии описаны в config.json → "lines". Связи рисуются SVG поверх раскладки.
+  function treeData() {
+    const list = epList();
+    const lines = (S.config.lines && S.config.lines.length ? S.config.lines : [{ id: 'A', name: 'Линия A' }]).slice();
+    const byId = {}; list.forEach((e) => { byId[e.id] = e; });
+    const lineOf = (e) => e.line || (lines[0] && lines[0].id) || 'A';
+    lines.forEach((l) => { l.eps = []; });
+    const prevInLine = {};
+    list.forEach((e) => {
+      const ln = lineOf(e);
+      if (!lines.find((l) => l.id === ln)) lines.push({ id: ln, name: 'Линия ' + ln, eps: [] });
+      const parent = e.after !== undefined ? byId[e.after] : prevInLine[ln];
+      e._parent = parent ? parent.id : null;
+      e._row = typeof e.row === 'number' ? e.row : (parent ? (parent._row || 0) + 1 : 0);
+      prevInLine[ln] = e;
+      lines.find((l) => l.id === ln).eps.push(e);
+    });
+    return { lines, rows: Math.max(1, ...list.map((e) => e._row + 1)) };
+  }
+  function treeNode(ep) {
+    const first = ep.scenes[0]; const l = loc(first && first.bg);
+    return `<article class="tn" data-ep="${esc(ep.id)}" style="grid-row:${ep._row + 1}">
+      <span class="tn-dot" aria-hidden="true"></span>
+      <div class="tn-card" style="${torn('tn' + ep.id, 1.2, 3, 'tb')}">
+        <a class="tn-pic ht" href="#play-${ep.id}" ${bgStyle(l)} aria-label="Играть: ${esc(ep.title)}"><span class="tn-no">${ransom(epNo(ep), { seed: 'n' + ep.id })}</span></a>
+        <div class="tn-body">
+          <div class="eyebrow">Эпизод ${esc(epNo(ep))}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
+          <h3>${esc(ep.title)}</h3>
+          ${ep.tagline ? `<p class="tagline">${esc(ep.tagline)}</p>` : ''}
+          <p class="tn-sum">${esc(ep.summary)}</p>
+          ${saveSlot(ep)}${caseBadge(ep)}
+          <div class="btns">
+            <a class="btn hot" href="#play-${ep.id}">▶ Играть</a>
+            <a class="btn" href="#ep-${ep.id}">Сцены</a>
+            ${ep.video ? `<a class="btn" href="${ytLink(ep)}" target="_blank" rel="noopener">Запись</a>` : ''}
+          </div>
+        </div>
+      </div>
+    </article>`;
+  }
+  function epTree() {
+    const { lines, rows } = treeData();
+    if (!epList().length) return '<p class="muted">Пока нет эпизодов.</p>';
+    return `<div class="tree" id="tree" style="--lanes:${lines.length};--rows:${rows}">
+      <svg class="tree-links" id="tree-links" aria-hidden="true"></svg>
+      ${lines.map((ln, i) => `<section class="lane" style="--lc:${esc(ln.color || ['#f2d230', '#22b8cf', '#e8457a', '#7cc46a'][i % 4])};grid-column:${i + 1}">
+        <header class="lane-h"><span class="lane-id">${ransom(ln.id, { seed: 'l' + ln.id })}</span><div><b>${esc(ln.name || 'Линия ' + ln.id)}</b>${ln.sub ? `<small>${esc(ln.sub)}</small>` : ''}</div></header>
+        <div class="lane-body" style="grid-template-rows:repeat(${rows}, auto)">
+          ${ln.eps.map(treeNode).join('')}
+          ${!ln.eps.length ? `<div class="tn tn-soon" style="grid-row:1"><span class="tn-dot" aria-hidden="true"></span><div class="tn-card soon"><b>Скоро</b><p>${esc(ln.soon || 'Эпизоды этой линии ещё в пути.')}</p></div></div>` : ''}
+        </div>
+      </section>`).join('')}
+    </div>`;
+  }
+  function drawTree() {
+    const tree = document.getElementById('tree'); const svg = document.getElementById('tree-links');
+    if (!tree || !svg) return;
+    const box = tree.getBoundingClientRect();
+    svg.setAttribute('width', box.width); svg.setAttribute('height', box.height);
+    svg.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`);
+    const dot = (id) => { const n = tree.querySelector(`[data-ep="${id}"] .tn-dot`); if (!n) return null; const r = n.getBoundingClientRect(); return { x: r.left + r.width / 2 - box.left, y: r.top + r.height / 2 - box.top, c: getComputedStyle(n).getPropertyValue('--lc') }; };
+    let out = '';
+    epList().forEach((e) => {
+      if (!e._parent) return;
+      const a = dot(e._parent), b = dot(e.id); if (!a || !b) return;
+      const col = (b.c || '#f2d230').trim();
+      const d = Math.abs(a.x - b.x) < 2 ? `M${a.x},${a.y} L${b.x},${b.y}` : `M${a.x},${a.y} C${a.x},${(a.y + b.y) / 2} ${b.x},${(a.y + b.y) / 2} ${b.x},${b.y}`;
+      out += `<path d="${d}" class="tl-bg"/><path d="${d}" class="tl" style="stroke:${col}"/>`;
+    });
+    svg.innerHTML = out;
+  }
+  window.addEventListener('resize', () => requestAnimationFrame(drawTree));
 
   function epCard(ep) {
     const first = ep.scenes[0];
     const l = loc(first && first.bg);
     return `<article class="ep" style="${torn('ep' + ep.id, 1.2, 3, 'tb')}">
       <a class="ep-pic ht" href="#play-${ep.id}" ${bgStyle(l)} aria-label="Читать: ${esc(ep.title)}">
-        <span class="ep-no">${ransom(pad2(ep.number), { seed: 'n' })}</span>
+        <span class="ep-no">${ransom(epNo(ep), { seed: 'n' })}</span>
       </a>
       <div class="ep-body">
-        <div class="eyebrow">Эпизод ${pad2(ep.number)}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
+        <div class="eyebrow">Эпизод ${epNo(ep)}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
         <h3>${esc(ep.title)}</h3>
         ${ep.tagline ? `<p class="tagline">${esc(ep.tagline)}</p>` : ''}
         <p>${esc(ep.summary)}</p>
@@ -207,10 +286,10 @@
     const ep = S.eps[id]; if (!ep || !ep.bonus) return notFound();
     const b = ep.bonus; const p = Case.progress(ep);
     if (!Case.bonusOpen(ep)) {
-      return shell('episodes', `${head('Бонус · эпизод ' + pad2(ep.number), 'Закрыто', p.auto ? 'Бонус открывается только тем, кто ищет улики сам. Включите в настройках новеллы (⚙) «Бросать кубики самому» и пройдите эпизод снова.' : `Найдите все улики эпизода, чтобы открыть этот материал. Сейчас в деле ${p.found} из ${p.total}.`)}
-        <div class="btns"><a class="btn hot" href="#play-${ep.id}">▶ Играть эпизод ${pad2(ep.number)}</a></div>`);
+      return shell('episodes', `${head('Бонус · эпизод ' + epNo(ep), 'Закрыто', p.auto ? 'Бонус открывается только тем, кто ищет улики сам. Включите в настройках новеллы (⚙) «Бросать кубики самому» и пройдите эпизод снова.' : `Найдите все улики эпизода, чтобы открыть этот материал. Сейчас в деле ${p.found} из ${p.total}.`)}
+        <div class="btns"><a class="btn hot" href="#play-${ep.id}">▶ Играть эпизод ${epNo(ep)}</a></div>`);
     }
-    shell('episodes', `${head('Бонус · эпизод ' + pad2(ep.number), b.title || 'Бонус', b.text || '')}
+    shell('episodes', `${head('Бонус · эпизод ' + epNo(ep), b.title || 'Бонус', b.text || '')}
       ${b.scene ? `<div class="btns"><a class="btn hot" href="#play-${ep.id}-bonus">▶ Секретная сцена</a></div>` : ''}
       ${(b.images || []).length ? `<div class="gallery">${b.images.map((im) => { const src = typeof im === 'string' ? im : im.src; const cap = typeof im === 'string' ? '' : im.caption || ''; return `<figure><a href="${esc(src)}" target="_blank" rel="noopener"><img src="${esc(src)}" alt="${esc(cap)}" loading="lazy"></a>${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`; }).join('')}</div>` : ''}
       ${b.note ? `<div class="callout" style="margin-top:28px">${esc(b.note)}</div>` : ''}`);
@@ -226,8 +305,15 @@
   }
 
   // ---------- Страницы ----------
+  // Куда ведёт «Играть»: эпизод с сохранением, иначе первый непройденный, иначе первый
+  function nextToPlay() {
+    const list = epList();
+    const saved = list.find((e) => { try { return !!JSON.parse(store.get('progress:' + e.id) || 'null'); } catch (x) { return false; } });
+    return saved || list.find((e) => !store.get('done:' + e.id)) || list[0];
+  }
+
   function home() {
-    const ep = epList()[0];
+    const ep = nextToPlay();
     const banner = S.config.banner || 'assets/brand/banner.webp';
     shell('', `
       <section class="hero">
@@ -237,14 +323,14 @@
           <p>${esc(S.config.intro)}</p>
           <p class="retell">Визуальная новелла по играм канала <a href="#channel">${esc(S.config.channel)}</a>: сессии можно не только посмотреть, но и пройти самому.</p>
           <div class="btns">
-            ${ep ? `<a class="btn hot" href="#play-${ep.id}">▶ Играть эпизод ${pad2(ep.number)}</a>` : ''}
+            ${ep ? `<a class="btn hot" href="#play-${ep.id}">▶ Играть эпизод ${epNo(ep)}</a>` : ''}
             <a class="btn ink" href="#characters">Кто есть кто</a>
           </div>
         </div>
       </section>
       ${aboutBlock()}
       <h2>${ransom('Эпизоды')}</h2>
-      <div class="eps">${epList().map(epCard).join('') || '<p class="muted">Пока нет эпизодов.</p>'}</div>
+      ${epTree()}
       <h2>${ransom('Персонажи')}</h2>
       ${charGrid()}`);
   }
@@ -270,14 +356,14 @@
     </section>`;
   }
 
-  function episodes() { shell('episodes', `${head('Архив', 'Эпизоды')}<div class="eps">${epList().map(epCard).join('')}</div>`); }
+  function episodes() { shell('episodes', `${head('Архив', 'Эпизоды', S.config.treeLead || '')}${epTree()}`); }
 
   function episodePage(id) {
     const ep = S.eps[id]; if (!ep) return notFound();
     const rolls = [];
     ep.scenes.forEach((sc) => sc.lines.forEach((l) => l.roll && rolls.push({ sc, l })));
     shell('episodes', `
-      ${head('Эпизод ' + pad2(ep.number) + (ep.badge ? ' · ' + ep.badge : ''), ep.title, ep.tagline ? ep.tagline + ' ' + ep.summary : ep.summary)}
+      ${head('Эпизод ' + epNo(ep) + (ep.badge ? ' · ' + ep.badge : ''), ep.title, ep.tagline ? ep.tagline + ' ' + ep.summary : ep.summary)}
       <div class="btns"><a class="btn hot" href="#play-${ep.id}">Читать</a>${ep.video ? `<a class="btn" href="${ytLink(ep)}" target="_blank" rel="noopener">Полная запись</a>` : ''}</div>
       ${caseBadge(ep)}
       <h2 class="h2s">Сцены</h2>
@@ -321,7 +407,7 @@
           <div class="eyebrow">${esc(c.role)}</div>
           <h1>${ransom(c.name)}</h1>
           <dl class="kv">
-            <dt>Игрок</dt><dd>${esc(c.player || '—')}</dd>
+            <dt>Игрок</dt><dd>${c.playerUrl ? `<a href="${esc(c.playerUrl)}" target="_blank" rel="noopener">${esc(c.player || '—')}</a>` : esc(c.player || '—')}</dd>
             <dt>Возраст</dt><dd>${esc(c.age || '—')}</dd>
             ${Object.keys(c.stats || {}).length ? `<dt>Кубики</dt><dd class="mono">${Object.entries(c.stats).map(([k, v]) => `${esc(k)} ${esc(v)}`).join(' · ')}</dd>` : ''}
             ${(c.tags || []).length ? `<dt>Метки</dt><dd>${c.tags.map((t) => `<span class="chip">${esc(t)}</span>`).join(' ')}</dd>` : ''}
@@ -359,7 +445,7 @@
 
   function world() {
     shell('world', `${head(S.config.system, 'Мир', S.config.intro)}
-      <h2 class="h2s">Словарь</h2><div class="notes">${(S.config.glossary || []).map((g, i) => note({ id: 'g' + i, name: g.term, text: g.text }, i)).join('')}</div>`);
+      ${(S.config.worldSections && S.config.worldSections.length ? S.config.worldSections : [{ title: 'Словарь', items: S.config.glossary || [] }]).map((sec, si) => `<h2 class="h2s">${esc(sec.title)}</h2><div class="notes">${(sec.items || []).map((g, i) => note({ id: 'w' + si + '-' + i, name: g.term, text: g.text }, i)).join('')}</div>`).join('')}`);
   }
 
   function search() {
@@ -443,7 +529,7 @@
   }
   applyFx();
 
-  window.App = { applyFx, S, bgStyle, spriteCls, store, esc, char, loc, ytLink, epList, lineText, spriteSrc, blinkSrc, bgSrc, ransom, torn, pad2, root: $app };
+  window.App = { epNo, applyFx, S, bgStyle, spriteCls, store, esc, char, loc, ytLink, epList, lineText, spriteSrc, blinkSrc, bgSrc, ransom, torn, pad2, root: $app };
   load().then(() => { if (window.Music) Music.init(S.config); route(); }).catch((e) => {
     $app.innerHTML = `<main class="wrap">${'<h1>Не загрузились данные</h1>'}<p class="lead">${esc(e.message)}</p>
       <p class="muted">Если вы открыли index.html двойным щелчком, браузер не даёт читать файлы с диска. Запустите в папке проекта <code>python -m http.server</code> и откройте http://localhost:8000, или смотрите сайт на GitHub Pages.</p></main>`;
