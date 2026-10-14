@@ -98,6 +98,7 @@
       const l = sc.lines[i];
       if (l.bg) st.bg = l.bg;
       if (l.show) Object.assign(st.stage, l.show);
+      if (l.flip) st.flip = Object.assign({}, st.flip, l.flip);
       if (l.hide) l.hide.forEach((c) => delete st.stage[c]);
       if (l.e) { if (typeof l.e === 'string') { if (l.c) st.expr[l.c] = l.e; } else Object.assign(st.expr, l.e); }
       if (l.fx) { if (l.fx === 'none') st.fx = {}; else if (PERSIST.includes(l.fx)) st.fx[l.fx] = true; }
@@ -519,6 +520,14 @@
         scheduleBlink(img);
       }
       w.style.left = x + '%';
+      // Авто-поворот: в файле персонаж смотрит вправо (или "faces": "left" в characters.json).
+      // Слева от центра — смотрит вправо, справа — влево, т.е. персонажи смотрят друг на друга.
+      const nvc = A().S.config.novel || {};
+      const faces = c.faces || nvc.spriteFaces || 'right';
+      let flip = false;
+      if (nvc.autoFlip !== false && !c.noFlip && faces !== 'front' && x !== 50) flip = (x < 50) !== (faces === 'right');
+      if (st.flip && st.flip[cid] !== undefined) flip = !!st.flip[cid];
+      w.classList.toggle('flip', flip);
       // Заглушки нарисованы по пояс — показываем их меньше и выше, чем настоящие спрайты в полный рост
       const ph = (img.getAttribute('src') || '').startsWith('data:');
       w.style.setProperty('--sk', (c.spriteScale || 1) * (ph ? 0.66 : 1));
