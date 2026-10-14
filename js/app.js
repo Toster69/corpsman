@@ -44,6 +44,13 @@
   function cutout(c, e, cls = '') {
     return `<img class="${spriteCls(c, e)} ${cls}" alt="${esc(c.name)}" src="${esc(spriteSrc(c, e))}" onerror="__imgFallback(this,'${c.id}','${e || 'default'}')">`;
   }
+  // Обложка эпизода: "cover" в файле эпизода — путь к картинке или id локации; иначе фон первой сцены
+  function coverStyle(ep) {
+    const c = ep.cover;
+    if (c && /[\/.]/.test(c)) return `style="background-image:url('${esc(c)}')"`;
+    const first = ep.scenes[0];
+    return bgStyle(loc(c || (first && first.bg)));
+  }
   function bgStyle(l, extra = '') {
     const src = bgSrc(l);
     if (l && l.bg) { const im = new Image(); im.onerror = () => document.querySelectorAll(`[data-bg="${l.id}"]`).forEach((el) => __bgFallback(el, l.id)); im.src = src; }
@@ -193,11 +200,10 @@
     return { lines, rows: Math.max(1, ...list.map((e) => e._row + 1)) };
   }
   function treeNode(ep) {
-    const first = ep.scenes[0]; const l = loc(first && first.bg);
     return `<article class="tn" data-ep="${esc(ep.id)}" style="grid-row:${ep._row + 1}">
       <span class="tn-dot" aria-hidden="true"></span>
       <div class="tn-card" style="${torn('tn' + ep.id, 1.2, 3, 'tb')}">
-        <a class="tn-pic ht" href="#play-${ep.id}" ${bgStyle(l)} aria-label="Играть: ${esc(ep.title)}"><span class="tn-no">${ransom(epNo(ep), { seed: 'n' + ep.id })}</span></a>
+        <a class="tn-pic ht" href="#play-${ep.id}" ${coverStyle(ep)} aria-label="Играть: ${esc(ep.title)}"><span class="tn-no">${ransom(epNo(ep), { seed: 'n' + ep.id })}</span></a>
         <div class="tn-body">
           <div class="eyebrow">Эпизод ${esc(epNo(ep))}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
           <h3>${esc(ep.title)}</h3>
@@ -247,10 +253,8 @@
   window.addEventListener('resize', () => requestAnimationFrame(drawTree));
 
   function epCard(ep) {
-    const first = ep.scenes[0];
-    const l = loc(first && first.bg);
     return `<article class="ep" style="${torn('ep' + ep.id, 1.2, 3, 'tb')}">
-      <a class="ep-pic ht" href="#play-${ep.id}" ${bgStyle(l)} aria-label="Читать: ${esc(ep.title)}">
+      <a class="ep-pic ht" href="#play-${ep.id}" ${coverStyle(ep)} aria-label="Читать: ${esc(ep.title)}">
         <span class="ep-no">${ransom(epNo(ep), { seed: 'n' })}</span>
       </a>
       <div class="ep-body">

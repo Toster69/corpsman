@@ -210,10 +210,12 @@ h3 { font: 700 22px/1.2 var(--f-ui); }
 @keyframes hop { 40% { transform: translateY(-1.6%); } }
 .spr.speak { transform: translateX(-50%) translateY(-1.4%); }
 .spr.dim img { filter: drop-shadow(3px 0 0 var(--paper)) drop-shadow(-3px 0 0 var(--paper)) drop-shadow(0 3px 0 var(--paper)) drop-shadow(0 -3px 0 var(--paper)) grayscale(.7) brightness(.5); }
-.spr.glitchy img { animation: jit 1.4s steps(2) infinite; }
+.spr.glitchy .spr-in { animation: jit 1.6s steps(1, end) infinite; }
+/* проклятые формы (зеркальные люди) не обесцвечиваются, когда говорит кто-то другой — только чуть темнеют */
+.spr.dim.glitchy img, .spr.dim.glitchy img.own { filter: brightness(.72) saturate(1.15); }
 .spr.mirror img { filter: drop-shadow(-4px 0 0 rgba(232,69,122,.85)) drop-shadow(4px 0 0 rgba(34,184,207,.85)); animation: jitM 2.2s steps(3) infinite; }
 @keyframes jitM { 0%,100% { translate: 0 0; } 33% { translate: -1% 0; } 66% { translate: 1% 0; } }
-@keyframes jit { 0%,100% { translate: 0 0; filter: none; } 25% { translate: -1.5% 0; filter: drop-shadow(6px 0 0 rgba(232,69,122,.8)) drop-shadow(-6px 0 0 rgba(34,184,207,.8)); } 50% { translate: 1.5% 0; filter: none; } 75% { translate: 0 0; filter: invert(1) hue-rotate(180deg); } }
+@keyframes jit { 0%, 100% { translate: 0 0; filter: none; } 18% { translate: -1.2% 0; filter: drop-shadow(5px 0 0 rgba(232,69,122,.75)) drop-shadow(-5px 0 0 rgba(34,184,207,.75)); } 30% { translate: 0 0; filter: none; } 62% { translate: 1% 0; filter: drop-shadow(-4px 0 0 rgba(232,69,122,.7)) drop-shadow(4px 0 0 rgba(34,184,207,.7)); } 72% { translate: 0 0; filter: none; } }
 .rain { z-index: 6; width: 100%; height: 100%; }
 .bug { position: absolute; top: 4.5%; right: 3.5%; z-index: 8; font: 700 clamp(10px, 1.5vw, 19px)/.95 var(--f-label); text-transform: uppercase; color: rgba(239,236,226,.72); text-align: right; letter-spacing: .02em; pointer-events: none; }
 
@@ -505,7 +507,7 @@ h3 { font: 700 22px/1.2 var(--f-ui); }
    fx-soft — без вспышек, тряски, глитча и помех; fx-off — без анимаций вообще. */
 html.fx-soft .fx-shake, html.fx-soft .fx-flicker .sprites, html.fx-soft .fx-glitch .bg, html.fx-soft .fx-glitch .sprites, html.fx-soft .tz-line.gl { animation: none !important; }
 html.fx-soft .fx-flash::before, html.fx-soft .static.on { animation: none !important; opacity: 0 !important; }
-html.fx-soft .spr.glitchy img, html.fx-soft .spr.mirror img { animation: none !important; }
+html.fx-soft .spr.glitchy .spr-in, html.fx-soft .spr.mirror img { animation: none !important; }
 html.fx-soft .fx-vhs .bg, html.fx-soft .fx-film .film-layer, html.fx-soft .fx-mirror .mirror-layer { animation: none !important; }
 html.fx-off *, html.fx-off *::before, html.fx-off *::after { animation: none !important; transition: none !important; }
 
@@ -650,3 +652,46 @@ html.fx-off .tree-links .tl { animation: none; }
   .lane { grid-column: 1 !important; }
   .tn { padding-left: 30px; } .tn-dot { left: 2px; }
 }
+
+/* ---------- Проявление силы ----------
+   "fx": "power"  — герои светятся изнутри, между ними собирается шарик света (только спрайты).
+   "fx": "power2" — усиленная версия: свет разрастается в шар и заливает весь кадр, фон тоже. */
+.fx-power .sprites img { animation: pwGlow 2.8s ease-in-out; }
+.fx-power2 .sprites img { animation: pwGlow2 3.6s ease-in-out; }
+@keyframes pwGlow {
+  0% { filter: none; }
+  30%, 70% { filter: brightness(1.15) saturate(1.1) drop-shadow(0 0 1cqh rgba(255,236,190,.95)) drop-shadow(0 0 3.5cqh rgba(170,240,225,.6)); }
+  100% { filter: none; } }
+@keyframes pwGlow2 {
+  0% { filter: none; }
+  35%, 75% { filter: brightness(1.3) saturate(1.05) drop-shadow(0 0 1.4cqh rgba(255,244,214,1)) drop-shadow(0 0 6cqh rgba(255,236,190,.8)); }
+  100% { filter: none; } }
+/* шарик света между героями — перед спрайтами */
+.fx-power::after { content: ""; position: absolute; left: 50%; top: 42%; width: 7cqh; height: 7cqh; margin: -3.5cqh 0 0 -3.5cqh; border-radius: 50%; z-index: 7; pointer-events: none;
+  background: radial-gradient(circle, #fffef6 0 26%, rgba(255,240,200,.95) 40%, rgba(170,240,225,.5) 60%, transparent 71%);
+  box-shadow: 0 0 3cqh 1.2cqh rgba(255,240,200,.7), 0 0 10cqh 4cqh rgba(170,240,225,.3);
+  animation: pwOrb 2.8s ease-in-out forwards; }
+@keyframes pwOrb {
+  0% { transform: scale(0); opacity: 0; }
+  25% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(.9); }
+  65% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(.3); opacity: 0; } }
+/* усиленная версия: тёплый свет растёт кругом из центра и заливает фон — за спрайтами, герои остаются видны и светятся */
+.fx-power2::after { content: ""; position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  background: radial-gradient(circle at 50% 42%, #fffef6 0 8%, rgba(255,240,205,.92) 22%, rgba(255,226,170,.7) 45%, rgba(170,240,225,.35) 70%, rgba(255,236,190,.15) 100%);
+  clip-path: circle(0% at 50% 42%); animation: pwFlood 3.6s cubic-bezier(.5,0,.3,1) forwards; }
+@keyframes pwFlood {
+  0% { clip-path: circle(0% at 50% 42%); opacity: 1; }
+  15% { clip-path: circle(6% at 50% 42%); opacity: 1; }
+  55% { clip-path: circle(110% at 50% 42%); opacity: .95; }
+  100% { clip-path: circle(110% at 50% 42%); opacity: 0; } }
+.fx-power2 .bg { animation: pwBg 3.6s ease-in-out; }
+@keyframes pwBg {
+  0% { filter: none; }
+  45%, 70% { filter: brightness(1.35) saturate(.8) sepia(.3); }
+  100% { filter: none; } }
+/* мягкий режим — без заливки кадра; без анимаций — ничего */
+html.fx-soft .fx-power2::after, html.fx-soft .fx-power2 .bg { animation: none; opacity: 0; }
+html.fx-off .fx-power::after, html.fx-off .fx-power2::after { display: none; }
+html.fx-off .fx-power .sprites img, html.fx-off .fx-power2 .sprites img, html.fx-off .fx-power2 .bg { animation: none; }

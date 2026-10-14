@@ -513,9 +513,9 @@
           img.parentNode.appendChild(ghost); later(() => ghost.remove(), 320);
           const inr = w.querySelector('.spr-in'); inr.classList.remove('bump'); void inr.offsetWidth; inr.classList.add('bump');
         }
-        img.dataset.src = src; img.src = src;
+        img.dataset.src = src; delete img.dataset.open; img.src = src;
         const cls = A().spriteCls(c, e); img.classList.toggle('own', cls === 'own'); img.classList.toggle('sticker', cls === 'sticker');
-        img.onerror = () => { img.onerror = null; img.classList.remove('own'); img.classList.add('sticker'); img.src = Art.sprite(c, e); img.dataset.blink = Art.sprite(c, e, { blink: true }); w.style.setProperty('--sk', (c.spriteScale || 1) * 0.66); w.style.setProperty('--y', (c.spriteY || 0) + 60); };
+        img.onerror = () => { img.onerror = null; img.classList.remove('own'); img.classList.add('sticker'); img.src = Art.sprite(c, e); img.dataset.open = img.src; img.dataset.blink = Art.sprite(c, e, { blink: true }); w.style.setProperty('--sk', (c.spriteScale || 1) * 0.66); w.style.setProperty('--y', (c.spriteY || 0) + 60); };
         img.dataset.blink = blinkSrc(c, e) || '';
         scheduleBlink(img);
       }
@@ -536,7 +536,7 @@
       w.classList.toggle('speak', cid === speaker);
       if (fresh && cid === speaker && !wasSpeak && !isNew) { const inr = w.querySelector('.spr-in'); inr.classList.remove('hop'); void inr.offsetWidth; inr.classList.add('hop'); }
       w.classList.toggle('dim', !!speaker && cid !== speaker && !isNarrator(char(speaker)));
-      w.classList.toggle('glitchy', e === 'glitch');
+      w.classList.toggle('glitchy', e === 'glitch' || (Array.isArray(c.glitchy) && c.glitchy.includes(e)));
       w.classList.toggle('immune', !!c.immune || cid === 'stranger');
     });
     box.querySelectorAll('.spr:not(.exit)').forEach((w) => {
@@ -552,7 +552,7 @@
     if (!P) return;
     img._bt = later(() => {
       if (!img.isConnected || !img.dataset.blink) return scheduleBlink(img);
-      const open = img.dataset.src; img.src = img.dataset.blink;
+      const open = img.dataset.open || img.dataset.src; img.src = img.dataset.blink;
       later(() => { if (img.isConnected && img.src === img.dataset.blink) img.src = open; scheduleBlink(img); }, 130);
     }, 2400 + Math.random() * 3800);
   }
@@ -573,7 +573,9 @@
     if (!fx || PERSIST.includes(fx) || fx === 'none') return;
     const st = $('stage');
     st.classList.remove('fx-' + fx); void st.offsetWidth; st.classList.add('fx-' + fx);
-    later(() => st && st.classList.remove('fx-' + fx), 1700);
+    // «Сила» длится дольше обычных вспышек
+    const dur = { power: 2800, power2: 3600 }[fx] || 1700;
+    later(() => st && st.classList.remove('fx-' + fx), dur);
   }
 
   function show(fresh) {

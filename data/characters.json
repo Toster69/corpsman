@@ -196,8 +196,12 @@
       "hairStyle": "long"
     },
     "sprites": {
-      "default": "assets/sprites/bix.png"
-    }
+      "default": "assets/sprites/bix.png",
+      "zl": "assets/sprites/bix_zl.png"
+    },
+    "glitchy": [
+      "zl"
+    ]
   },
   {
     "id": "coco",
