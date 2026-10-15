@@ -102,6 +102,10 @@
       if (l.hide) l.hide.forEach((c) => delete st.stage[c]);
       if (l.e) { if (typeof l.e === 'string') { if (l.c) st.expr[l.c] = l.e; } else Object.assign(st.expr, l.e); }
       if (l.fx) { if (l.fx === 'none') st.fx = {}; else if (PERSIST.includes(l.fx)) st.fx[l.fx] = true; }
+      // "fxOff": "negative" или ["negative","vhs"] — выключить конкретный постоянный эффект (включается снова через "fx")
+      if (l.fxOff) [].concat(l.fxOff).forEach((f) => { delete st.fx[f]; });
+      // "immune": {"emily": true} — спрайт не поддаётся негативу/зеркалу с этой реплики; false — снова поддаётся
+      if (l.immune) st.immune = Object.assign({}, st.immune, l.immune);
       if (l.music !== undefined) st.music = l.music;
     }
     if (st.music === undefined) {
@@ -537,7 +541,8 @@
       if (fresh && cid === speaker && !wasSpeak && !isNew) { const inr = w.querySelector('.spr-in'); inr.classList.remove('hop'); void inr.offsetWidth; inr.classList.add('hop'); }
       w.classList.toggle('dim', !!speaker && cid !== speaker && !isNarrator(char(speaker)));
       w.classList.toggle('glitchy', e === 'glitch' || (Array.isArray(c.glitchy) && c.glitchy.includes(e)));
-      w.classList.toggle('immune', !!c.immune || cid === 'stranger');
+      const imm = st.immune && st.immune[cid] !== undefined ? !!st.immune[cid] : (!!c.immune || cid === 'stranger');
+      w.classList.toggle('immune', imm);
     });
     box.querySelectorAll('.spr:not(.exit)').forEach((w) => {
       if (keep.has(w.dataset.c)) return;
