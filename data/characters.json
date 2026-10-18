@@ -65,7 +65,9 @@
       "damage": "assets/sprites/aiza/07_AIZA_DAMAGE_p1_v001.webp",
       "smoke": "assets/sprites/aiza/05_AIZA_cross_p1_v001.webp"
     },
-    "immune": true
+    "immune": true,
+    "alias": "Незнакомка",
+    "reveal": "ep001-s13-24"
   },
   {
     "id": "thompson",
@@ -419,7 +421,9 @@
       "glitch_think": "assets/sprites/mike/02_MIKE_thinking_p1_v001.webp",
       "glitch_talk": "assets/sprites/mike/03_MIKE_talk_p1_v001.webp",
       "glitch_back": "assets/sprites/mike/07_MIKE_BACK_p1_v001.webp"
-    }
+    },
+    "alias": "Незнакомец",
+    "reveal": "ep003-s9-16"
   },
   {
     "id": "hank",

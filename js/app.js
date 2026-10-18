@@ -169,6 +169,7 @@
       <footer class="foot"><div class="foot-in">
         <span>${esc(S.config.title)} · ${esc(S.config.system)}${S.config.about && S.config.about.music ? ` · Музыка: <a href="${esc(S.config.about.music.url)}" target="_blank" rel="noopener">${esc(S.config.about.music.name)}</a>` : ''}</span>
         <span>Пересказ игр канала <a href="#channel">${esc(S.config.channel)}</a> · ведущий ${esc(S.config.gm)}</span>
+        <span class="foot-copy">${esc(S.config.copyright || '© 2014–2026 Тостер Годя · «Санитары» / Corpsman.')} Тексты и рисунки — <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/deed.ru" target="_blank" rel="noopener">CC BY-NC-ND 4.0</a>, код — все права защищены, музыка принадлежит её авторам.</span>
       </div></footer>`;
     window.scrollTo(0, 0);
     const mb = document.getElementById('music-btn');

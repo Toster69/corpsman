@@ -1,0 +1,17 @@
+# Рабочие файлы — остаются только на компьютере автора, на GitHub не попадают
+CLAUDE.md
+s_push.bat
+start-local.bat
+tools/
+
+# Исходники картинок и музыки в полном качестве
+*.psd
+*.kra
+*.xcf
+src/
+sources/
+
+# Системный мусор
+Thumbs.db
+desktop.ini
+.DS_Store

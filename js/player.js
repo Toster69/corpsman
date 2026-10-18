@@ -122,6 +122,8 @@
       if (li >= ep.scenes[si].lines.length) { si++; li = 0; if (si >= ep.scenes.length) return null; }
       if (li < 0) { si--; if (si < 0) return null; li = ep.scenes[si].lines.length - 1; }
       const l = ep.scenes[si].lines[li];
+      // подсказки ("hint") пропускаем, если зритель уже проходил этот эпизод до конца
+      if (l.hint && P && P.skipHints) continue;
       if (!isRoll(l) && !(dir < 0 && isCheck(l))) return [si, li];
     }
   }
@@ -149,6 +151,7 @@
     const { esc, S } = A();
     const set = settings();
     P = { ep, si: 0, li: 0, typing: null, auto: false, autoT: null, panel: null, overlay: null, timers: new Set(), log: [], set, lastBg: null, lastScene: -1, rain: null, busy: false };
+    P.skipHints = !!A().store.get('done:' + ep.id);
     document.body.classList.add('playing');
     const root = document.createElement('div');
     root.className = 'player'; root.id = 'player';
@@ -409,18 +412,35 @@
     });
   }
 
+  // Имя до знакомства: "alias": "Незнакомка" и "reveal": "ep001-s13-24" в characters.json.
+  // До этой реплики (в порядке config.episodes) героя подписывают как alias, начиная с неё — настоящим именем.
+  function nameAt(c, epId, si, li) {
+    if (!c) return '';
+    const nm = c.short || c.name;
+    if (!c.alias || !c.reveal) return nm;
+    const { epList, S } = A();
+    const ids = epList().map((e) => e.id);
+    const [re, rs, rl] = String(c.reveal).split('-');
+    const a = ids.indexOf(epId), b = ids.indexOf(re);
+    if (a < 0 || b < 0) return nm;
+    if (a !== b) return a < b ? c.alias : nm;
+    const rsi = ((S.eps[re] || {}).scenes || []).findIndex((x) => x.id === rs);
+    const before = si < rsi || (si === rsi && li < (parseInt(rl, 10) || 0));
+    return before ? c.alias : nm;
+  }
+
   // «Ранее в…»: строки с "recap": true из прошлого эпизода или ep.previously
   function recapItems() {
     const { epList } = A();
     const ep = P.ep;
-    if (Array.isArray(ep.previously)) return ep.previously.map((x) => ({ c: x.c, text: x.text, bg: x.bg, e: x.e }));
+    if (Array.isArray(ep.previously)) return ep.previously.map((x) => ({ c: x.c, text: x.text, bg: x.bg, e: x.e, pos: [ep.id, -1, -1] }));
     const list = epList(); const i = list.indexOf(ep); const prev = list[i - 1];
     if (!prev) return [];
     const items = [];
     prev.scenes.forEach((sc, si) => sc.lines.forEach((l, li) => {
       if (!l.recap) return;
       const st = stateAt(prev, si, li);
-      items.push({ c: l.c, text: lineStr(l), bg: st.bg, e: l.c ? st.expr[l.c] : null, music: st.music });
+      items.push({ c: l.c, text: lineStr(l), bg: st.bg, e: l.c ? st.expr[l.c] : null, music: st.music, pos: [prev.id, si, li] });
     }));
     return items;
   }
@@ -451,7 +471,7 @@
         rimg.onerror = () => { rimg.onerror = null; rimg.src = Art.sprite(c, it.e || 'default'); mark(); };
         mark();
       }
-      $('rc-cap').innerHTML = `${c ? `<b style="color:${esc(c.color)}">${esc(c.short || c.name)}</b> ` : ''}${esc(it.text)}`;
+      $('rc-cap').innerHTML = `${c ? `<b style="color:${esc(c.color)}">${esc(it.pos ? nameAt(c, ...it.pos) : (c.short || c.name))}</b> ` : ''}${esc(it.text)}`;
       el.querySelector('.recap').classList.remove('cut'); void el.offsetWidth; el.querySelector('.recap').classList.add('cut');
       await new Promise((r) => { tap = r; later(r, 3000); });
     }
@@ -745,6 +765,14 @@
     showLine(st, sc, ln, fresh);
   }
 
+  // Подсветка элементов интерфейса для подсказок: короткие имена или CSS-селекторы
+  const HINT_EL = { next: '#qm [data-q=next]', back: '#qm [data-q=back]', skip: '#qm [data-q=skip]', auto: '#qm [data-q=auto], #b-auto', hide: '#qm [data-q=hide]', log: '#qm [data-q=log], #b-log', scenes: '#b-scenes', clues: '#b-clues', settings: '#b-set', sound: '#b-sound', tc: '#tc', box: '#box' };
+  function hintTargets(h) {
+    document.querySelectorAll('.hint-on').forEach((x) => x.classList.remove('hint-on'));
+    if (!h || h === true) return;
+    [].concat(h).forEach((k) => { try { document.querySelectorAll(HINT_EL[k] || k).forEach((x) => x.classList.add('hint-on')); } catch (e) {} });
+  }
+
   function showLine(st, sc, ln, fresh) {
     const { ep } = P; const { char, ransom, esc, ytLink, store, S } = A();
     const stage = $('stage');
@@ -755,20 +783,24 @@
 
     // окно диалога: реплика — комиксовый пузырь, мысль — облачко, рассказчик — жёлтая плашка
     const c0 = char(ln.c); const c = isNarrator(c0) ? null : c0;
-    const kind = c && ln.think ? 'think' : c && ln.say ? 'say' : 'narr';
+    // "hint" — подсказка об интерфейсе (обучение в пилоте): плашка «Подсказка» и подсветка кнопок.
+    // "hint": true — просто подсказка; "hint": "log" или ["next", "back"] — ещё и подсветить эти кнопки.
+    const kind = ln.hint ? 'hint' : c && ln.think ? 'think' : c && ln.say ? 'say' : 'narr';
+    hintTargets(ln.hint);
     const box = $('box'); box.className = 'box k-' + kind;
     box.style.setProperty('--c', c ? (c.color || '#efece2') : '#f2d230');
     const plate = $('plate');
-    if (c) { plate.hidden = false; plate.innerHTML = ransom(c.short || c.name, { seed: c.id }) + (kind === 'think' ? '<i>мысли</i>' : ''); }
+    if (kind === 'hint') { plate.hidden = false; plate.innerHTML = ransom('Подсказка', { seed: 'hint' }); }
+    else if (c) { plate.hidden = false; plate.innerHTML = ransom(nameAt(c, P.ep.id, P.si, P.li), { seed: c.id }) + (kind === 'think' ? '<i>мысли</i>' : ''); }
     else plate.hidden = true;
     const tail = $('tail'); const pos = c && st.stage[c.id];
-    if (pos !== undefined) {
+    if (pos !== undefined && kind !== 'hint') {
       const x = layout(st.stage)[c.id] ?? 50;
       tail.hidden = false; tail.style.left = Math.max(6, Math.min(94, (x - 2.5) / 95 * 100)) + '%';
     } else tail.hidden = true;
 
     const tx = $('txt');
-    tx.className = 'txt ' + kind;
+    tx.className = 'txt ' + (kind === 'hint' ? 'narr' : kind);
     type(tx, lineStr(ln), !fresh);
 
     $('tc').innerHTML = ln.t && ep.video ? `<a href="${ytLink(ep, ln.t)}" target="_blank" rel="noopener" title="Открыть этот момент в записи">▶ ${esc(ln.t)}</a>` : '';
@@ -783,7 +815,7 @@
         Sound.sfx(S.config.sounds && S.config.sounds.clue, 0.7);
       }
     }
-    if (fresh) P.log.push({ c, ln });
+    if (fresh && !ln.hint) P.log.push({ c, ln, si: P.si, li: P.li });
     try { history.replaceState(null, '', `#play-${ep.id}-${sc.id}-${P.li}`); } catch (e) {}
     if (!ep.isBonus) store.set('progress:' + ep.id, JSON.stringify({ s: sc.id, l: P.li }));
     if (fresh && P.li === 0) { const sv = $('saved'); if (sv) { sv.classList.remove('on'); void sv.offsetWidth; sv.classList.add('on'); } }
@@ -908,13 +940,13 @@
     steps.push(`<div class="end-title">${ransom('Конец эпизода')}<small>${esc(ep.title)}</small></div>`);
     steps.push(`<div class="credits"><div class="end-h">${ransom('В ролях')}</div>
       <div class="cr-row">${players.map((c) => `<div class="cr" style="--c:${esc(c.color)}"><img class="${A().spriteCls(c, 'default')}" src="${esc(spriteSrc(c, 'default'))}" alt=""><b>${esc(c.name)}</b><small>${esc(c.player || '')}</small></div>`).join('')}</div>
-      ${npcs.length ? `<p class="cr-npc">${npcs.map((c) => esc(c.name)).join(' · ')}<br><small>Все остальные роли: ${esc(S.config.gm)}</small></p>` : ''}
+      ${npcs.length ? `<p class="cr-npc">${npcs.map((c) => esc(c.alias && nameAt(c, ep.id, 1e9, 1e9) === c.alias ? c.alias : c.name)).join(' · ')}<br><small>Все остальные роли: ${esc(S.config.gm)}</small></p>` : ''}
       <p class="cr-gm">Ведущий — <b>${esc(S.config.gm)}</b> · ${esc(S.config.channel)}</p>
       ${S.config.about && S.config.about.music ? `<p class="cr-npc"><small>Музыка — ${esc(S.config.about.music.name)}</small></p>` : ''}</div>`);
     steps.push(`<div class="summary"><div class="end-h">${ransom('Итоги')}</div>
       <div class="sum-grid">
         <div><div class="eyebrow">Дело ${Case.progress(ep).found}/${Case.progress(ep).total}</div>${caseList(ep)}</div>
-        <div><div class="eyebrow">Встречены</div>${npcs.map((c) => `<p style="color:${esc(c.color)}">· ${esc(c.name)}</p>`).join('') || '<p class="muted">—</p>'}
+        <div><div class="eyebrow">Встречены</div>${npcs.map((c) => `<p style="color:${esc(c.color)}">· ${esc(c.alias && nameAt(c, ep.id, 1e9, 1e9) === c.alias ? c.alias : c.name)}</p>`).join('') || '<p class="muted">—</p>'}
           <p class="muted mono">Жетоны неудачи: ${Case.tokens()}</p></div>
       </div>${bonusNote(ep)}</div>`);
     if (ep.teaser && (ep.teaser.lines || []).length) steps.push('TEASER');
@@ -944,7 +976,7 @@
       if (!P) return;
       const c = l.c && char(l.c);
       const z = $('tz'); z.classList.remove('gl'); void z.offsetWidth; z.classList.add('gl');
-      z.innerHTML = `${c ? `<b style="color:${esc(c.color)}">${esc(c.short || c.name)}</b>` : ''}<span>${esc(l.text)}</span>`;
+      z.innerHTML = `${c ? `<b style="color:${esc(c.color)}">${esc(nameAt(c, P.ep.id, 1e9, 1e9))}</b>` : ''}<span>${esc(l.text)}</span>`;
       await new Promise((res) => { const f = () => { el.removeEventListener('click', f); el.removeEventListener('skip', f); res(); }; el.addEventListener('click', f); el.addEventListener('skip', f); later(f, 3400); });
       staticBurst(160);
     }
@@ -971,7 +1003,7 @@
     const { esc, lineText } = A(); const ep = P.ep;
     const el = document.createElement('div'); el.className = 'side'; el.dataset.k = kind;
     el.onclick = (e) => e.stopPropagation();
-    if (kind === 'log') el.innerHTML = `<h3>История</h3>${P.log.slice().reverse().map((x) => `<div class="log-item">${x.c && !x.ln.n ? `<b style="color:${esc(x.c.color)}">${esc(x.c.short || x.c.name)}</b>` : ''}<p>${esc(lineText(x.ln))}</p></div>`).join('') || '<p class="muted">Пока пусто.</p>'}`;
+    if (kind === 'log') el.innerHTML = `<h3>История</h3>${P.log.slice().reverse().map((x) => `<div class="log-item">${x.c && !x.ln.n ? `<b style="color:${esc(x.c.color)}">${esc(nameAt(x.c, P.ep.id, x.si ?? 1e9, x.li ?? 1e9))}</b>` : ''}<p>${esc(lineText(x.ln))}</p></div>`).join('') || '<p class="muted">Пока пусто.</p>'}`;
     if (kind === 'scenes') {
       el.innerHTML = `<h3>Сцены</h3>${ep.scenes.map((s, i) => `<button class="jump ${i === P.si ? 'on' : ''}" data-i="${i}"><span class="mono">${String(i + 1).padStart(2, '0')}</span> ${esc(s.title)}</button>`).join('')}`;
       el.querySelectorAll('.jump').forEach((b) => b.onclick = () => { closePanel(); const [a, c] = settle(ep, +b.dataset.i, 0); go(a, c, true); });
