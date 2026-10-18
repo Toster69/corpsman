@@ -81,9 +81,59 @@ h3 { font: 700 22px/1.2 var(--f-ui); }
 /* ---------- Главная ---------- */
 .hero { margin: 0 -16px; position: relative; }
 .hero-img { aspect-ratio: 16 / 9; max-height: 72vh; width: 100%; background: #000 center / cover; }
-.clip { position: relative; margin: -70px 16px 0 auto; max-width: 600px; background: var(--paper); color: var(--k); padding: 28px 30px 26px; }
+.clip { position: relative; margin: 0; background: var(--paper); color: var(--k); padding: 28px 30px 26px; }
 .clip p { font: 400 17px/1.7 var(--f-read); margin: 0; max-width: 52ch; }
 .clip .eyebrow { color: var(--mg); }
+/* Под баннером: слева вход (фраза и кнопки), справа короткий список новостей */
+.hero-row { position: relative; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: stretch; margin: -70px 16px 0; }
+.home-start { display: flex; flex-direction: column; justify-content: center; }
+.home-start .pitch { font: 500 21px/1.5 var(--f-read); max-width: 40ch; }
+.home-start .pitch a { color: var(--mg); }
+.home-start .btns { align-items: center; }
+.play-note { flex-basis: 100%; font: 400 13px/1.4 var(--f-read); color: #6b675e; }
+.news-box { background: var(--k2); color: var(--paper); padding: 26px 26px 20px; display: flex; flex-direction: column; }
+.news-box .eyebrow { color: var(--ye); }
+.news-rows { list-style: none; margin: 0 0 10px; padding: 0; display: grid; }
+.news-rows li + li { border-top: 1px solid rgba(255,255,255,.08); }
+.news-rows a, .news-rows li > div { position: relative; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 4px 12px; align-items: baseline; padding: 11px 26px 11px 0; color: inherit; text-decoration: none; }
+.news-rows time { font: 500 12px/1 var(--f-label); letter-spacing: .1em; color: var(--mute); }
+.news-rows b { font: 500 15px/1.4 var(--f-read); }
+.news-rows i { position: absolute; right: 4px; top: 11px; font-style: normal; color: var(--mg); transition: transform .15s; }
+.news-rows a:hover b { text-decoration: underline; text-decoration-color: var(--mg); }
+.news-rows a:hover i { transform: translateX(3px); }
+.news-box .news-all { margin-top: auto; padding-top: 6px; }
+
+/* О проекте — внизу главной: слева лор, автор и музыка, справа история проекта */
+.about { margin-top: 72px; }
+.about .about-txt .eyebrow { color: var(--mg); }
+.muted-read { color: var(--mute) !important; font-size: 15px !important; }
+.tl-wrap > .eyebrow { margin-bottom: 14px; }
+
+/* Что нового: спокойный список во всю ширину; на главной и на странице #news */
+.news { margin: 64px 0 12px; }
+.news-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.news-all { font: 500 13px/1 var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--mg); text-decoration: none; white-space: nowrap; }
+.news-all:hover { text-decoration: underline; }
+.news-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--k3); }
+.news-list li { border-bottom: 1px solid var(--k3); }
+.news-list a, .news-list li > div { display: grid; grid-template-columns: 110px minmax(0, 1fr) 24px; gap: 20px; align-items: baseline; padding: 16px 6px; color: var(--paper); text-decoration: none; transition: background .15s; }
+.news-list li > div { grid-template-columns: 110px minmax(0, 1fr); }
+.news-list a:hover, .news-list a:focus-visible { background: rgba(255,255,255,.04); }
+.news-list time { font: 500 12px/1.6 var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
+.news-list p { margin: 0; font: 400 15px/1.6 var(--f-read); color: var(--paper2); max-width: 80ch; }
+.news-list p b { display: block; font: 600 17px/1.35 var(--f-read); color: var(--paper); margin-bottom: 2px; }
+.news-list i { font-style: normal; color: var(--mg); transition: transform .15s; }
+.news-list a:hover i { transform: translateX(3px); }
+@media (max-width: 860px) {
+  .hero-row { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .home-start .pitch { font-size: 18px; }
+  .news-rows a, .news-rows li > div { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .news-list a, .news-list li > div { grid-template-columns: minmax(0, 1fr) 20px; gap: 4px 12px; }
+  .news-list time { grid-column: 1 / -1; }
+}
+
 
 .eps { display: grid; gap: 22px; }
 .ep { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0; background: var(--k2); }
@@ -208,7 +258,7 @@ h3 { font: 700 22px/1.2 var(--f-ui); }
 @keyframes bump { 35% { transform: scale(1.025, .975); } 70% { transform: scale(.99, 1.01) translateY(-.8%); } }
 .spr-in.hop { animation: hop .3s ease-out; }
 @keyframes hop { 40% { transform: translateY(-1.6%); } }
-.spr.speak { transform: translateX(-50%) translateY(-1.4%); }
+.spr.speak { transform: translateX(-50%) translateY(calc(-1.4% - var(--lift, 0) * 1cqh)); }
 .spr.dim img { filter: drop-shadow(3px 0 0 var(--paper)) drop-shadow(-3px 0 0 var(--paper)) drop-shadow(0 3px 0 var(--paper)) drop-shadow(0 -3px 0 var(--paper)) grayscale(.7) brightness(.5); }
 .spr.glitchy .spr-in { animation: jit 1.6s steps(1, end) infinite; }
 /* проклятые формы (зеркальные люди) не обесцвечиваются, когда говорит кто-то другой — только чуть темнеют */
@@ -475,7 +525,8 @@ h3 { font: 700 22px/1.2 var(--f-ui); }
   .ep, .dossier, .about-grid { grid-template-columns: minmax(0, 1fr); }
   .timeline li { margin-left: calc(var(--i) * 2%); }
   .dossier .d-pic { max-width: 300px; }
-  .clip { margin: -40px 0 0; padding: 22px 18px; }
+  .hero-row { margin: -40px 0 0; }
+  .clip { margin: 0; padding: 22px 18px; }
   .scenes li { grid-template-columns: 96px minmax(0, 1fr); }
   .scenes li .tc { grid-column: 2; }
   .brand img { height: 38px; }
@@ -621,36 +672,86 @@ html.fx-off .lvl.out { display: none; }
 .static { display: none !important; }
 
 
-/* ---------- Древо эпизодов ---------- */
-.tree { position: relative; display: grid; grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); gap: 0 28px; margin: 8px 0 40px; }
-.tree-links { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
-.tree-links .tl-bg { fill: none; stroke: #000; stroke-width: 9; stroke-linecap: round; }
-.tree-links .tl { fill: none; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 2 9; animation: tlFlow 1.6s linear infinite; }
-@keyframes tlFlow { to { stroke-dashoffset: -22; } }
-html.fx-off .tree-links .tl { animation: none; }
-.lane { position: relative; min-width: 0; --lc: #f2d230; }
-.lane-h { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; position: relative; z-index: 1; }
+/* ---------- Эпизоды: «По порядку событий» и «По линиям» ---------- */
+.ev-wrap { margin: 26px 0 44px; }
+.ev-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 0 0 26px; }
+.ev-switch { display: inline-flex; background: var(--k3); padding: 4px; gap: 4px; }
+.ev-switch button { border: 0; cursor: pointer; background: transparent; color: var(--paper2); padding: 10px 16px; font: 600 13px/1 var(--f-label); letter-spacing: .1em; text-transform: uppercase; }
+.ev-switch button:hover { color: var(--paper); }
+.ev-switch button[aria-pressed="true"] { background: var(--paper); color: var(--k); }
+.ev-hint { margin: 0; color: var(--mute); font-size: 14px; line-height: 1.45; flex: 1 1 260px; }
+
+.ev-chrono, .ev-lane { display: flex; flex-direction: column; gap: 22px; container-type: inline-size; min-width: 0; }
+.ev-lines { display: grid; grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); gap: 34px 28px; align-items: start; }
+.ev-lane .lane-h { padding-bottom: 12px; border-bottom: 3px solid var(--lc); margin: 0; }
+.lane-h { display: flex; align-items: center; gap: 12px; }
 .lane-id { font-size: 34px; line-height: 1; }
 .lane-h b { display: block; font: 600 15px/1.2 var(--f-label); letter-spacing: .08em; text-transform: uppercase; color: var(--lc); }
 .lane-h small { display: block; color: var(--paper2); font-size: 13px; margin-top: 2px; }
-.lane-body { display: grid; gap: 34px; position: relative; }
-.tn { position: relative; padding-left: 38px; z-index: 1; }
-.tn-dot { position: absolute; left: 6px; top: 20px; width: 18px; height: 18px; border-radius: 50%; background: var(--lc); border: 4px solid #000; box-shadow: 0 0 0 2px var(--lc); }
-.tn-card { background: var(--k2); display: flex; flex-direction: column; }
-.tn-pic { position: relative; display: block; width: 100%; aspect-ratio: 16 / 7; background: #000 center / cover; flex: none; }
-.tn-no { position: absolute; left: 10px; bottom: 8px; font-size: 26px; z-index: 2; }
-.tn-body { padding: 18px 20px; min-width: 0; }
-.tn-body h3 { margin: 6px 0 0; }
-.tn-body .tagline { margin: 6px 0 0; }
-.tn-sum { font: 400 15px/1.55 var(--f-read); color: var(--paper2); margin: 8px 0 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.tn-card.soon { display: block; padding: 18px 20px; background: transparent; border: 2px dashed color-mix(in srgb, var(--lc) 60%, transparent); }
-.tn-card.soon b { font: 600 15px/1 var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--lc); }
-.tn-card.soon p { margin: 8px 0 0; color: var(--paper2); font-size: 14px; }
-.tn-soon .tn-dot { background: transparent; }
-@media (max-width: 760px) {
-  .tree { grid-template-columns: 1fr; gap: 30px; }
-  .lane { grid-column: 1 !important; }
-  .tn { padding-left: 30px; } .tn-dot { left: 2px; }
+.ev-note { margin: -8px 0 0; padding: 8px 12px; border-left: 3px solid var(--lc); background: color-mix(in srgb, var(--lc) 9%, transparent); color: var(--paper2); font-size: 13.5px; line-height: 1.45; }
+.ev-note a { color: var(--lc); }
+
+/* Разделитель «Тем временем» в хронологии */
+.ev-sep { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 0; padding: 10px 0 0; border-top: 2px dashed color-mix(in srgb, var(--lc) 55%, transparent); }
+.ev-sep.first { margin-top: 0; padding-top: 0; border-top: 0; }
+.ev-sep-t { background: var(--lc); color: var(--k); padding: 5px 9px; font: 700 12px/1 var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.ev-sep-n { font: 600 14px/1.3 var(--f-label); letter-spacing: .08em; text-transform: uppercase; color: var(--lc); }
+.ev-sep-n small { font: 400 13px var(--f-ui); letter-spacing: 0; text-transform: none; color: var(--paper2); margin-left: 4px; }
+
+/* Карточка эпизода */
+.ec { display: grid; background: var(--k2); border-left: 5px solid var(--lc); min-width: 0; }
+.ec-pic { position: relative; display: block; background: #000 center / cover; min-height: 100%; }
+.ec-no { position: absolute; left: 10px; bottom: 8px; font-size: 24px; z-index: 2; }
+.ec-body { padding: 16px 20px 18px; min-width: 0; }
+.ec-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font: 500 12px/1 var(--f-label); letter-spacing: .14em; text-transform: uppercase; }
+.ec-meta .badge { margin-left: 0; }
+.ec-line { color: var(--k); background: var(--lc); padding: 4px 7px; font-weight: 700; }
+.ec-code { color: var(--paper2); }
+.ec h3 { margin: 10px 0 0; overflow-wrap: anywhere; }
+.ec .tagline { margin: 6px 0 0; font-size: 14.5px; line-height: 1.45; }
+.ec-sum { font: 400 15px/1.55 var(--f-read); color: var(--paper2); margin: 8px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ec .btns { margin-top: 14px; gap: 8px; }
+.ec .save, .ec .case-badge { margin-top: 10px; }
+
+/* Крупная: обложка сверху, а в широкой колонке — слева во всю высоту */
+.ec-big { grid-template-columns: 1fr; }
+.ec-big .ec-pic { aspect-ratio: 16 / 7; }
+.ec-big .ec-no { font-size: 32px; }
+.ec-big h3 { font-size: 28px; }
+.ec-big .ec-sum { -webkit-line-clamp: 5; font-size: 16px; }
+@container (min-width: 820px) {
+  .ec-big { grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); }
+  .ec-big .ec-pic { aspect-ratio: auto; min-height: 340px; }
+  .ec-big .ec-body { padding: 26px 28px; align-self: center; }
+}
+
+/* Компактная: маленькое превью слева */
+.ec-small { grid-template-columns: minmax(0, 260px) minmax(0, 1fr); }
+.ec-small .ec-pic { min-height: 170px; }
+.ec-small h3 { font-size: 20px; }
+.ec-small .btn { padding: 10px 16px; font-size: 13px; }
+@container (max-width: 640px) {
+  .ec-small { grid-template-columns: minmax(0, 150px) minmax(0, 1fr); }
+  .ec-small .ec-no { font-size: 18px; }
+  .ec-small .ec-body { padding: 14px 16px; }
+  .ec-small .ec-sum { -webkit-line-clamp: 2; font-size: 14px; }
+}
+@container (max-width: 470px) {
+  .ec-small { grid-template-columns: 1fr; }
+  .ec-small .ec-pic { aspect-ratio: 16 / 6; min-height: 0; }
+}
+
+.ec-soon { padding: 18px 20px; border: 2px dashed color-mix(in srgb, var(--lc) 60%, transparent); }
+.ec-soon b { font: 600 15px/1 var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--lc); }
+.ec-soon p { margin: 8px 0 0; color: var(--paper2); font-size: 14px; }
+
+@media (max-width: 900px) {
+  .ev-lines { grid-template-columns: 1fr; gap: 40px; }
+}
+@media (max-width: 560px) {
+  .ev-switch { display: flex; width: 100%; }
+  .ev-switch button { flex: 1; padding: 11px 8px; }
+  .ec-big h3 { font-size: 23px; }
 }
 
 /* ---------- Проявление силы ----------
@@ -695,3 +796,76 @@ html.fx-off .tree-links .tl { animation: none; }
 html.fx-soft .fx-power2::after, html.fx-soft .fx-power2 .bg { animation: none; opacity: 0; }
 html.fx-off .fx-power::after, html.fx-off .fx-power2::after { display: none; }
 html.fx-off .fx-power .sprites img, html.fx-off .fx-power2 .sprites img, html.fx-off .fx-power2 .bg { animation: none; }
+
+/* ---------- Мега-взрыв кубика ("fx": "mega") ----------
+   Удар и вспышка, лучи растра крутятся от центра, осколки кубиков разлетаются,
+   надпись буквами-вырезками и итог броска в «двадцатиграннике». Около 3,8 с. */
+.fx-mega { animation: megaShake .6s linear .05s; }
+@keyframes megaShake { 10% { transform: translate(-9px, 4px) rotate(-.4deg); } 25% { transform: translate(8px, -5px) rotate(.4deg); } 40% { transform: translate(-6px, 5px); } 55% { transform: translate(5px, -3px); } 70% { transform: translate(-3px, 2px); } 85% { transform: translate(2px, -1px); } }
+.fx-mega .bg { animation: megaBg 3.8s ease-out; }
+@keyframes megaBg { 0% { filter: none; } 6% { filter: brightness(2.4) saturate(0); } 30% { filter: saturate(1.8) contrast(1.2); } 100% { filter: none; } }
+.mega { --mu: min(1cqh, .85cqw); position: absolute; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; display: grid; place-items: center; animation: megaOut 3.8s ease-in forwards; }
+@keyframes megaOut { 0%, 82% { opacity: 1; } 100% { opacity: 0; } }
+.mega::before { content: ""; position: absolute; inset: 0; background: var(--paper); animation: flash .55s ease-out forwards; }
+.mega-rays { position: absolute; left: 50%; top: 46%; width: calc(260 * var(--mu)); height: calc(260 * var(--mu)); margin: calc(-130 * var(--mu)) 0 0 calc(-130 * var(--mu)); border-radius: 50%;
+  background: repeating-conic-gradient(rgba(242, 210, 48, .85) 0 7deg, transparent 7deg 15deg, rgba(232, 69, 122, .7) 15deg 21deg, transparent 21deg 30deg);
+  -webkit-mask: radial-gradient(closest-side, transparent 6%, #000 9%, #000 45%, transparent 70%); mask: radial-gradient(closest-side, transparent 6%, #000 9%, #000 45%, transparent 70%);
+  mix-blend-mode: screen; animation: megaRays 3.8s cubic-bezier(.15, .8, .3, 1) forwards; }
+.mega-rays::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(rgba(11, 11, 13, .55) 32%, transparent 36%); background-size: calc(1.2 * var(--mu)) calc(1.2 * var(--mu)); }
+@keyframes megaRays { 0% { transform: scale(.05) rotate(0); opacity: 0; } 8% { opacity: 1; } 100% { transform: scale(1) rotate(40deg); opacity: .9; } }
+.mega-shards { position: absolute; left: 50%; top: 46%; }
+.mega-shards i { position: absolute; width: calc(4 * var(--mu) * var(--s)); height: calc(4 * var(--mu) * var(--s)); margin: calc(-2 * var(--mu) * var(--s)); background: var(--c); border: calc(.4 * var(--mu)) solid var(--k); box-shadow: calc(.4 * var(--mu)) calc(.5 * var(--mu)) 0 rgba(0, 0, 0, .55);
+  transform: rotate(var(--a)) translateX(0) rotate(0); animation: megaShard 1.5s cubic-bezier(.1, .7, .3, 1) .08s forwards; opacity: 0; }
+@keyframes megaShard { 0% { opacity: 1; transform: rotate(var(--a)) translateX(0) rotate(0) scale(.3); } 75% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateX(calc(var(--dist) * var(--mu))) rotate(540deg) scale(1); } }
+.mega-txt { position: relative; display: grid; justify-items: center; gap: calc(1.6 * var(--mu)); margin-top: calc(-22 * var(--mu)); text-align: center; }
+.mega-title { font-size: calc(13 * var(--mu)); line-height: 1; white-space: nowrap; animation: megaPop .5s cubic-bezier(.2, 1.7, .4, 1) .12s backwards; }
+.mega-title .rl { box-shadow: calc(.5 * var(--mu)) calc(.7 * var(--mu)) 0 rgba(0, 0, 0, .7); }
+@keyframes megaPop { 0% { transform: scale(2.6) rotate(-8deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.mega-val { display: grid; place-items: center; width: calc(22 * var(--mu)); height: calc(22 * var(--mu)); background: var(--ye); clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  animation: megaDie 1.1s cubic-bezier(.2, 1.4, .4, 1) .45s backwards; }
+.mega-val b { font: 700 calc(11 * var(--mu))/1 var(--f-label); color: var(--k); letter-spacing: -.02em; }
+@keyframes megaDie { 0% { transform: scale(0) rotate(-540deg); } 100% { transform: none; } }
+.mega-note { background: var(--k); color: var(--paper); padding: calc(.8 * var(--mu)) calc(1.8 * var(--mu)); font: 600 calc(3 * var(--mu))/1.2 var(--f-label); letter-spacing: .14em; text-transform: uppercase; animation: megaPop .45s ease-out 1s backwards; }
+html.fx-soft .fx-mega, html.fx-soft .fx-mega .bg { animation: none; }
+html.fx-soft .mega::before, html.fx-soft .mega-shards { display: none; }
+html.fx-soft .mega-rays { animation-duration: 0s; animation-delay: 0s; }
+html.fx-off .mega::before, html.fx-off .mega-shards { display: none; }
+
+/* fx "threads" — розовые нити обвивают героя: задняя половина петель за спрайтом, передняя — перед ним */
+.spr.threaded img.cur, .spr.threaded img.ghost { position: relative; z-index: 1; }
+.spr.threaded img.ghost { position: absolute; }
+.th-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; animation: thIn .9s ease-out both; }
+.th-back { z-index: 0; opacity: .75; }
+.th-front { z-index: 2; mix-blend-mode: screen; }
+.th-svg path { fill: none; stroke: var(--thc, #ff7ab8); stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.th-svg .th-glow { stroke-width: .8cqh; opacity: .35; filter: blur(.3cqh); animation: thPulse 2.4s ease-in-out var(--d, 0s) infinite; }
+.th-svg .th-core { stroke-width: .25cqh; opacity: .9; }
+.th-svg .th-flow { stroke: #fff3f8; stroke-width: .18cqh; stroke-dasharray: 6 18; animation: thFlow var(--t, 3s) linear var(--d, 0s) infinite; }
+.th-svg .th { transform-box: view-box; animation: thBob var(--t, 3s) ease-in-out var(--d, 0s) infinite alternate; }
+@keyframes thIn { from { opacity: 0; } }
+@keyframes thFlow { to { stroke-dashoffset: -24; } }
+@keyframes thPulse { 0%, 100% { opacity: .25; } 50% { opacity: .6; } }
+@keyframes thBob { from { translate: 0 -1.2%; } to { translate: 0 1.2%; } }
+.fx-threads .spr.threaded img.cur { filter: drop-shadow(0 0 .9cqh rgba(255,122,184,.8)) drop-shadow(0 0 2.4cqh rgba(255,122,184,.4)); }
+.fx-threads .spr.threaded.dim img.cur { filter: drop-shadow(0 0 .9cqh rgba(255,122,184,.55)) grayscale(.5) brightness(.65); }
+html.fx-soft .th-svg .th, html.fx-soft .th-svg .th-glow { animation: none; }
+html.fx-off .th-svg .th-flow { display: none; }
+
+/* fx "moon" — луч луны: столб холодного света сверху, в нём кружится пыль; герои внутри подсвечены */
+.moon-layer { z-index: 4; opacity: 0; transition: opacity 1.2s ease; }
+.fx-moon .moon-layer { opacity: 1; }
+.moon-layer::before { content: ""; position: absolute; inset: -5% 0 0; clip-path: polygon(24% 0, 76% 0, 102% 100%, -2% 100%);
+  background: linear-gradient(180deg, rgba(232,246,214,.55), rgba(214,236,226,.22) 45%, rgba(200,230,230,.08) 80%, transparent),
+              radial-gradient(60% 40% at 50% 0%, rgba(255,255,240,.45), transparent 70%);
+  mix-blend-mode: screen; filter: blur(.6cqh); animation: moonBreath 5s ease-in-out infinite; }
+.moon-layer::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 92%; height: 14%; translate: -50% 30%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(232,246,214,.38), transparent); mix-blend-mode: screen; }
+.moon-layer i { position: absolute; inset: 0; clip-path: polygon(24% 0, 76% 0, 102% 100%, -2% 100%);
+  background-image: radial-gradient(circle, rgba(255,255,240,.8) 0 1px, transparent 1.6px), radial-gradient(circle, rgba(255,255,240,.5) 0 1px, transparent 1.6px);
+  background-size: 9cqw 11cqh, 13cqw 17cqh; background-position: 0 0, 4cqw 6cqh; animation: moonDust 14s linear infinite; opacity: .7; }
+.fx-moon .spr img.cur { filter: brightness(1.08) drop-shadow(0 -.6cqh 1.4cqh rgba(232,246,214,.35)); }
+.fx-moon .spr.dim img.cur { filter: grayscale(.6) brightness(.6) drop-shadow(0 -.6cqh 1.4cqh rgba(232,246,214,.25)); }
+.fx-moon.fx-threads .spr.threaded img.cur { filter: brightness(1.08) drop-shadow(0 0 .9cqh rgba(255,122,184,.8)) drop-shadow(0 0 2.4cqh rgba(255,122,184,.4)); }
+@keyframes moonBreath { 0%, 100% { opacity: .85; } 50% { opacity: 1; } }
+@keyframes moonDust { to { background-position: 0 22cqh, 4cqw 40cqh; } }
+html.fx-soft .moon-layer::before, html.fx-soft .moon-layer i { animation: none; }

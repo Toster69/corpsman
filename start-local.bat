@@ -12,7 +12,7 @@ echo  Чтобы остановить сервер, закройте это ок
 echo.
 
 rem Открываем браузер через пару секунд, когда сервер уже запустится
-start "" /b cmd /c "timeout /t 2 >nul & start http://localhost:%PORT%/"
+#start "" /b cmd /c "timeout /t 2 >nul & start http://localhost:%PORT%/"
 
 where py >nul 2>nul
 if %errorlevel%==0 (

@@ -2,7 +2,7 @@
    Читает эпизод из data/episodes/*.json. */
 (function () {
   const A = () => window.App;
-  const PERSIST = ['negative', 'rain', 'vhs', 'film', 'mirror'];
+  const PERSIST = ['negative', 'rain', 'vhs', 'film', 'mirror', 'threads', 'moon'];
   const POS = { farleft: 13, left: 26, center: 50, right: 74, farright: 87 };
   // Авто-раскладка: персонажи расходятся по сцене в зависимости от их количества,
   // порядок слева направо берётся из указанных позиций (left / center / right…)
@@ -101,7 +101,10 @@
       if (l.flip) st.flip = Object.assign({}, st.flip, l.flip);
       if (l.hide) l.hide.forEach((c) => delete st.stage[c]);
       if (l.e) { if (typeof l.e === 'string') { if (l.c) st.expr[l.c] = l.e; } else Object.assign(st.expr, l.e); }
-      if (l.fx) { if (l.fx === 'none') st.fx = {}; else if (PERSIST.includes(l.fx)) st.fx[l.fx] = true; }
+      // "fx" — один эффект строкой или несколько списком: "fx": ["threads", "power"]
+      if (l.fx) [].concat(l.fx).forEach((f) => { if (f === 'none') st.fx = {}; else if (PERSIST.includes(f)) st.fx[f] = true; });
+      // "threads": {"from": "lex"} — у кого розовые нити (fx "threads"), см. функцию threads()
+      if (l.threads) st.threads = Object.assign({}, st.threads, l.threads);
       // "fxOff": "negative" или ["negative","vhs"] — выключить конкретный постоянный эффект (включается снова через "fx")
       if (l.fxOff) [].concat(l.fxOff).forEach((f) => { delete st.fx[f]; });
       // "immune": {"emily": true} — спрайт не поддаётся негативу/зеркалу с этой реплики; false — снова поддаётся
@@ -164,6 +167,7 @@
       <div class="p-wrap"><div class="tv"><div class="stage" id="stage" tabindex="0" aria-live="polite">
         <div class="bg" id="bg1"></div><div class="bg" id="bg2" style="opacity:0"></div>
         <div class="layer ht-layer"></div>
+        <div class="layer moon-layer"><i></i></div>
         <div class="sprites" id="sprites"></div>
         <canvas class="layer rain" id="rain" hidden></canvas>
         <div class="layer vhs-layer"><span class="osd">PLAY ▶</span></div>
@@ -519,7 +523,10 @@
         }
         img.dataset.src = src; delete img.dataset.open; img.src = src;
         const cls = A().spriteCls(c, e); img.classList.toggle('own', cls === 'own'); img.classList.toggle('sticker', cls === 'sticker');
-        img.onerror = () => { img.onerror = null; img.classList.remove('own'); img.classList.add('sticker'); img.src = Art.sprite(c, e); img.dataset.open = img.src; img.dataset.blink = Art.sprite(c, e, { blink: true }); w.style.setProperty('--sk', (c.spriteScale || 1) * 0.66); w.style.setProperty('--y', (c.spriteY || 0) + 60); };
+        // нет картинки для эмоции — сначала пробуем обычный спрайт героя, и только потом рисованную заглушку
+        const dflt = (c.sprites || {}).default;
+        const toPh = () => { img.onerror = null; img.classList.remove('own'); img.classList.add('sticker'); img.src = Art.sprite(c, e); img.dataset.open = img.src; img.dataset.blink = Art.sprite(c, e, { blink: true }); w.style.setProperty('--sk', (c.spriteScale || 1) * 0.66); w.style.setProperty('--y', (c.spriteY || 0) + 60); };
+        img.onerror = dflt && src !== dflt ? () => { img.onerror = toPh; img.src = dflt; } : toPh;
         img.dataset.blink = blinkSrc(c, e) || '';
         scheduleBlink(img);
       }
@@ -536,6 +543,8 @@
       const ph = (img.getAttribute('src') || '').startsWith('data:');
       w.style.setProperty('--sk', (c.spriteScale || 1) * (ph ? 0.66 : 1));
       w.style.setProperty('--y', (c.spriteY || 0) + (ph ? 60 : 0));
+      // "speakLift" в characters.json — насколько (в % высоты кадра) герой поднимается, когда говорит (для низких героев)
+      w.style.setProperty('--lift', c.speakLift || 0);
       const wasSpeak = w.classList.contains('speak');
       w.classList.toggle('speak', cid === speaker);
       if (fresh && cid === speaker && !wasSpeak && !isNew) { const inr = w.querySelector('.spr-in'); inr.classList.remove('hop'); void inr.offsetWidth; inr.classList.add('hop'); }
@@ -574,13 +583,119 @@
     };
     tick();
   }
-  function oneShot(fx) {
+  // "fx": "moon" — ребята в луче луны: столб света сверху (см. .moon-layer в style.css).
+  // "fx": "threads" — розовые нити обвивают героя: петли вокруг груди, задняя половина за спрайтом, передняя — перед ним.
+  // По умолчанию у Лекса. "threads": {"from": "lex", "y": 27, "size": 1, "color": "#ff7ab8"} — всё необязательно:
+  // y — центр петель в процентах от роста фигуры (0 — макушка, 100 — подошвы), size — ширина петель.
+  // Фигура ищется по непрозрачным пикселям картинки, поэтому пустые поля вокруг персонажа не мешают.
+  const TH_FIG = new Map();
+  function figure(img, cb) {
+    const src = img.currentSrc || img.src;
+    if (TH_FIG.has(src)) return TH_FIG.get(src);
+    if (!img.complete || !img.naturalWidth) { img.addEventListener('load', cb, { once: true }); return null; }
+    let f = null;
+    try {
+      const W = 120, H = Math.max(1, Math.round(W * img.naturalHeight / img.naturalWidth));
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      const g = cv.getContext('2d'); g.drawImage(img, 0, 0, W, H);
+      const d = g.getImageData(0, 0, W, H).data; const rows = [];
+      let top = -1, bot = -1;
+      for (let y = 0; y < H; y++) {
+        let l = -1, r = -1;
+        for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 40) { if (l < 0) l = x; r = x; }
+        rows.push(l < 0 ? null : [l / W * 100, (r + 1) / W * 100]);
+        if (l >= 0) { if (top < 0) top = y; bot = y; }
+      }
+      if (top >= 0) f = { top: top / H * 100, bot: (bot + 1) / H * 100, rows, H };
+    } catch (e) { f = null; }
+    if (!f) f = { top: 0, bot: 100, rows: null, H: 1 };
+    TH_FIG.set(src, f); return f;
+  }
+  function threads(st) {
+    if (!P) return;
+    const on = st && st.fx && st.fx.threads;
+    const opt = Object.assign({ from: 'lex' }, (st && st.threads) || {});
+    const box = $('sprites'); if (!box) return;
+    P.thLast = on ? st : null;
+    box.querySelectorAll('.spr').forEach((w) => {
+      const want = on && w.dataset.c === opt.from && !w.classList.contains('exit');
+      const inr = w.querySelector('.spr-in'); const img = w.querySelector('img.cur');
+      if (!want || !img) { w.classList.remove('threaded'); inr && inr.querySelectorAll('.th-svg').forEach((x) => x.remove()); delete w.dataset.th; return; }
+      w.classList.add('threaded');
+      const fig = figure(img, () => { if (P && P.thLast) threads(P.thLast); });
+      if (!fig) return;
+      const flip = w.classList.contains('flip');
+      const key = JSON.stringify(opt) + (img.currentSrc || img.src).slice(-80) + flip;
+      if (w.dataset.th === key) return;
+      w.dataset.th = key;
+      inr.querySelectorAll('.th-svg').forEach((x) => x.remove());
+      const c = A().char(opt.from) || {};
+      const cy = opt.y ?? c.threadsY ?? 27, sz = opt.size ?? c.threadsSize ?? 1;
+      const col = opt.color || '#ff7ab8';
+      const fh = fig.bot - fig.top;
+      // ширина фигуры на нужной высоте (по картинке); без данных — середина кадра
+      const span = (yy) => {
+        if (!fig.rows) return [35, 65];
+        const r0 = Math.round(yy / 100 * fig.H); let l = 100, r = 0;
+        for (let k = r0 - 2; k <= r0 + 2; k++) { const v = fig.rows[k]; if (v) { l = Math.min(l, v[0]); r = Math.max(r, v[1]); } }
+        return r > l ? [l, r] : [35, 65];
+      };
+      // петли: смещение от центра (в % роста), наклон, скорость
+      const loops = [[-5, -9, 3.2], [-2.5, 6, 4.1], [0, -4, 3.6], [2.5, 10, 4.8], [5, -7, 3.9]];
+      const back = [], front = [];
+      loops.forEach(([dy, rot, dur], i) => {
+        const y = fig.top + (cy + dy) / 100 * fh;
+        let [l, r] = span(y);
+        if (flip) [l, r] = [100 - r, 100 - l];
+        const cx = (l + r) / 2, rx = (r - l) / 2 * (1.12 + (i % 2) * 0.08) * sz, ry = fh * (0.016 + (i % 3) * 0.004);
+        const x0 = cx - rx, x1 = cx + rx;
+        const g = (inner) => `<g transform="rotate(${rot} ${cx.toFixed(1)} ${y.toFixed(1)})" class="th" style="--d:${(-i * 0.7).toFixed(1)}s;--t:${dur}s">${inner}</g>`;
+        const f2 = (v) => v.toFixed(2);
+        const top = `M${f2(x0)},${f2(y)} A${f2(rx)},${f2(ry)} 0 0 1 ${f2(x1)},${f2(y)}`;
+        const bot = `M${f2(x0)},${f2(y)} A${f2(rx)},${f2(ry)} 0 0 0 ${f2(x1)},${f2(y)}`;
+        const w1 = (0.22 + (i % 2) * 0.12).toFixed(2);
+        back.push(g(`<path class="th-glow" d="${top}"/><path class="th-core" d="${top}" style="stroke-width:${w1}cqh"/><path class="th-flow" d="${top}" pathLength="100"/>`));
+        front.push(g(`<path class="th-glow" d="${bot}"/><path class="th-core" d="${bot}" style="stroke-width:${w1}cqh"/><path class="th-flow" d="${bot}" pathLength="100"/>`));
+      });
+      const svg = (cls, body) => `<svg class="th-svg ${cls}" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style="--thc:${col}">${body}</svg>`;
+      inr.insertAdjacentHTML('afterbegin', svg('th-back', back.join('')));
+      inr.insertAdjacentHTML('beforeend', svg('th-front', front.join('')));
+    });
+  }
+
+  function oneShot(fx, ln) {
     if (!fx || PERSIST.includes(fx) || fx === 'none') return;
     const st = $('stage');
     st.classList.remove('fx-' + fx); void st.offsetWidth; st.classList.add('fx-' + fx);
-    // «Сила» длится дольше обычных вспышек
-    const dur = { power: 2800, power2: 3600 }[fx] || 1700;
+    if (fx === 'mega') megaBurst((ln && ln.mega) || {});
+    // «Сила» и мега-взрыв длятся дольше обычных вспышек
+    const dur = { power: 2800, power2: 3600, mega: 3800 }[fx] || 1700;
     later(() => st && st.classList.remove('fx-' + fx), dur);
+  }
+
+  // "fx": "mega" — мега-взрыв кубика (эксплоуд за эксплоудом): удар, лучи, осколки и итог броска.
+  // Надписи берутся из реплики: "mega": { "title": "Эксплоуд!", "value": "53", "note": "Рекорд стола" }.
+  // Всё необязательно: без "mega" будет просто «Эксплоуд!».
+  function megaBurst(m) {
+    const st = $('stage'); if (!st) return;
+    const { ransom, esc, S } = A();
+    const old = st.querySelector('.mega'); if (old) old.remove();
+    const cols = ['#f2d230', '#e8457a', '#22b8cf', '#efece2'];
+    const shards = Array.from({ length: 16 }, (_, i) => {
+      const a = i / 16 * 360 + Math.random() * 16, d = 32 + Math.random() * 24, s = 0.6 + Math.random() * 0.9;
+      return `<i style="--a:${a.toFixed(0)}deg;--dist:${d.toFixed(0)};--s:${s.toFixed(2)};--c:${cols[i % 4]}"></i>`;
+    }).join('');
+    const el = document.createElement('div');
+    el.className = 'mega'; el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = `<div class="mega-rays"></div><div class="mega-shards">${shards}</div>
+      <div class="mega-txt">
+        <div class="mega-title slap">${ransom(m.title || 'Эксплоуд!', { seed: 'mega' })}</div>
+        ${m.value != null && m.value !== '' ? `<div class="mega-val"><b>${esc(m.value)}</b></div>` : ''}
+        ${m.note ? `<div class="mega-note">${esc(m.note)}</div>` : ''}
+      </div>`;
+    st.appendChild(el);
+    Sound.sfx(S.config.sounds && S.config.sounds.roll, 0.9);
+    later(() => el.remove(), 3800);
   }
 
   function show(fresh) {
@@ -605,6 +720,7 @@
     // Начало сцены: сначала только фон и название, потом выходят персонажи и текст
     if (sceneChanged && fresh && nv.sceneIntro !== false) {
       renderSprites({ stage: {}, expr: {} }, null, true);
+      threads(null);
       const box = $('box'); box.classList.add('away');
       const L = A().loc(st.bg); const ms = nv.sceneTitleMs || 2400;
       const t = document.createElement('div'); t.className = 'lvl';
@@ -633,7 +749,8 @@
     const { ep } = P; const { char, ransom, esc, ytLink, store, S } = A();
     const stage = $('stage');
     renderSprites(st, ln.c, fresh);
-    if (fresh) oneShot(ln.fx);
+    if (fresh) [].concat(ln.fx || []).forEach((f) => oneShot(f, ln));
+    threads(st);
     if (fresh && ln.sfx) Sound.sfx(ln.sfx);
 
     // окно диалога: реплика — комиксовый пузырь, мысль — облачко, рассказчик — жёлтая плашка

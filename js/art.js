@@ -138,6 +138,22 @@
       g.fillStyle = '#1b1b1b'; g.fillRect(W * 0.38, H * 0.72, W * 0.24, 18); g.fillRect(W * 0.39, H * 0.66, W * 0.22, 12); g.fillRect(W * 0.4, H * 0.72, 10, 70); g.fillRect(W * 0.6 - 10, H * 0.72, 10, 70);
     },
     negative(g, W, H, r) { presets.street(g, W, H, r); },
+    // Изнанка линии B: лес из обрывков бумаги, картонная земля, луна — дырка в коробке
+    cardboard(g, W, H, r) {
+      grad(g, W, H, [[0, '#2a2a2a'], [0.55, '#555'], [1, '#1a1a1a']]);
+      const scraps = (n, y0, y1, s0, s1, c) => { for (let i = 0; i < n; i++) { const x = r() * W, y = y0 + r() * (y1 - y0), s = s0 + r() * (s1 - s0); g.fillStyle = c[Math.floor(r() * c.length)]; g.beginPath(); g.moveTo(x + (r() - .5) * s, y - s * .6); for (let k = 0; k < 5; k++) g.lineTo(x + (r() - .5) * s * 1.4, y + (r() - .5) * s); g.closePath(); g.fill(); } };
+      scraps(70, H * 0.05, H * 0.55, 60, 160, ['#6a6a6a', '#7a7a7a', '#5a5a5a']);
+      g.fillStyle = '#fafafa'; g.beginPath(); g.arc(W * 0.7, H * 0.2, 64, 0, 7); g.fill();
+      glow(g, W * 0.7, H * 0.2, 60, 520, 'rgba(255,255,255,.4)');
+      trees(g, r, 40, H * 0.74, 220, 400, '#3a3a3a', W);
+      for (let i = 0; i < 22; i++) { const x = r() * W, w = 10 + r() * 16, h = 260 + r() * 340; g.fillStyle = r() > 0.5 ? '#202020' : '#2c2c2c'; g.fillRect(x, H * 0.82 - h, w, h); }
+      scraps(90, H * 0.08, H * 0.6, 50, 140, ['#999', '#888', '#aaa', '#777']);
+      g.fillStyle = '#8a8a8a'; g.fillRect(0, H * 0.8, W, H * 0.2);
+      g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 4;
+      for (let y = H * 0.82; y < H; y += 16) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y + (r() - .5) * 6); g.stroke(); }
+      g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.moveTo(W * 0.62, H * 0.24); g.lineTo(W * 0.78, H * 0.24); g.lineTo(W * 0.62, H); g.lineTo(W * 0.3, H); g.fill();
+      trees(g, r, 10, H * 1.02, 480, 760, '#141414', W);
+    },
     rain(g, W, H, r) {
       presets.street(g, W, H, r);
       g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2;
@@ -164,6 +180,7 @@
     studio: ['#0b0b0d', '#3a2350', '#9a4a3a', '#e09a3a', '#f2d78a'],
     street: ['#0b0b0d', '#1f2a5c', '#1d8f9a', '#7fd0c0', '#f2d230'],
     negative: ['#0b0b0d', '#0d4f4a', '#1fb39a', '#8ef0b0', '#f4fbe8'],
+    cardboard: ['#0b0b0d', '#3a2160', '#7d4fcf', '#3fbf8a', '#d9f2c4'],
     rain: ['#0b0b0d', '#16224a', '#2a5d9a', '#3fb9d6', '#d8f1f6'],
     manor: ['#0b0b0d', '#2c2c30', '#6b6b70', '#b8b6ae', '#efece2'],
     plain: ['#0b0b0d', '#2a2350', '#1d8f9a', '#e8457a', '#f2d230']

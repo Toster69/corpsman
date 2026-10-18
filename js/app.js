@@ -171,86 +171,97 @@
         <span>Пересказ игр канала <a href="#channel">${esc(S.config.channel)}</a> · ведущий ${esc(S.config.gm)}</span>
       </div></footer>`;
     window.scrollTo(0, 0);
-    if (document.getElementById('tree')) { requestAnimationFrame(drawTree); setTimeout(drawTree, 400); if (document.fonts) document.fonts.ready.then(drawTree); }
     const mb = document.getElementById('music-btn');
     if (mb) { mb.onclick = (e) => { e.stopPropagation(); SiteMusic.toggle(); }; SiteMusic.paint(); }
   }
   const head = (eyebrow, title, lead) => `<header class="page-head"><div class="eyebrow">${esc(eyebrow)}</div><h1>${ransom(title)}</h1>${lead ? `<p class="lead">${esc(lead)}</p>` : ''}</header>`;
 
 
-  // ---------- Древо эпизодов ----------
-  // Каждый эпизод живёт на своей линии ("line": "A", "B"…) и продолжает другой ("after": "ep000").
-  // Линии описаны в config.json → "lines". Связи рисуются SVG поверх раскладки.
-  function treeData() {
-    const list = epList();
-    const lines = (S.config.lines && S.config.lines.length ? S.config.lines : [{ id: 'A', name: 'Линия A' }]).slice();
-    const byId = {}; list.forEach((e) => { byId[e.id] = e; });
-    const lineOf = (e) => e.line || (lines[0] && lines[0].id) || 'A';
-    lines.forEach((l) => { l.eps = []; });
-    const prevInLine = {};
-    list.forEach((e) => {
-      const ln = lineOf(e);
-      if (!lines.find((l) => l.id === ln)) lines.push({ id: ln, name: 'Линия ' + ln, eps: [] });
-      const parent = e.after !== undefined ? byId[e.after] : prevInLine[ln];
-      e._parent = parent ? parent.id : null;
-      e._row = typeof e.row === 'number' ? e.row : (parent ? (parent._row || 0) + 1 : 0);
-      prevInLine[ln] = e;
-      lines.find((l) => l.id === ln).eps.push(e);
+  // ---------- Эпизоды: два вида ----------
+  // «По порядку событий» — все эпизоды в порядке config.episodes, первый крупно, остальные компактно;
+  //   перед первым эпизодом стоит плашка «Начало» с линией, а где история переключается на другую линию — «Тем временем».
+  // «По линиям» — каждая линия своей колонкой (на телефоне — друг под другом).
+  // Выбор зрителя запоминается; вид по умолчанию — config.episodesView: "chrono" или "lines".
+  const LANE_COLORS = ['#f2d230', '#22b8cf', '#e8457a', '#7cc46a'];
+  function lineList() {
+    const lines = (S.config.lines && S.config.lines.length ? S.config.lines : [{ id: 'A', name: 'Линия A' }])
+      .map((l, i) => Object.assign({}, l, { color: l.color || LANE_COLORS[i % 4], eps: [] }));
+    epList().forEach((e) => {
+      const id = e.line || lines[0].id;
+      let l = lines.find((x) => x.id === id);
+      if (!l) { l = { id, name: 'Линия ' + id, color: LANE_COLORS[lines.length % 4], eps: [] }; lines.push(l); }
+      l.eps.push(e);
     });
-    return { lines, rows: Math.max(1, ...list.map((e) => e._row + 1)) };
+    return lines;
   }
-  function treeNode(ep) {
-    return `<article class="tn" data-ep="${esc(ep.id)}" style="grid-row:${ep._row + 1}">
-      <span class="tn-dot" aria-hidden="true"></span>
-      <div class="tn-card" style="${torn('tn' + ep.id, 1.2, 3, 'tb')}">
-        <a class="tn-pic ht" href="#play-${ep.id}" ${coverStyle(ep)} aria-label="Играть: ${esc(ep.title)}"><span class="tn-no">${ransom(epNo(ep), { seed: 'n' + ep.id })}</span></a>
-        <div class="tn-body">
-          <div class="eyebrow">Эпизод ${esc(epNo(ep))}${ep.badge ? ` <span class="badge">${esc(ep.badge)}</span>` : ''}</div>
-          <h3>${esc(ep.title)}</h3>
-          ${ep.tagline ? `<p class="tagline">${esc(ep.tagline)}</p>` : ''}
-          <p class="tn-sum">${esc(ep.summary)}</p>
-          ${saveSlot(ep)}${caseBadge(ep)}
-          <div class="btns">
-            <a class="btn hot" href="#play-${ep.id}">▶ Играть</a>
-            <a class="btn" href="#ep-${ep.id}">Сцены</a>
-            ${ep.video ? `<a class="btn" href="${ytLink(ep)}" target="_blank" rel="noopener">Запись</a>` : ''}
-          </div>
+  const lineOf = (ep, lines) => lines.find((l) => l.id === (ep.line || lines[0].id)) || lines[0];
+  function epView() { const v = store.get('corpsman:epView') || S.config.episodesView; return v === 'lines' ? 'lines' : 'chrono'; }
+  // Эпизод другой линии, после которого начинается эта история ("after" указывает на чужую линию)
+  function startsAfter(ep, lines) {
+    const p = ep.after && S.eps[ep.after];
+    return p && lineOf(p, lines) !== lineOf(ep, lines) ? p : null;
+  }
+
+  function epItem(ep, lines, size) {
+    const ln = lineOf(ep, lines);
+    return `<article class="ec ec-${size}" data-ep="${esc(ep.id)}" style="--lc:${esc(ln.color)};${torn('ec' + ep.id, 1, 3, 'tb')}">
+      <a class="ec-pic ht" href="#play-${ep.id}" ${coverStyle(ep)} aria-label="Играть: ${esc(ep.title)}"><span class="ec-no">${ransom(epNo(ep), { seed: 'n' + ep.id })}</span></a>
+      <div class="ec-body">
+        <div class="ec-meta"><span class="ec-line">Линия ${esc(ln.id)}</span><span class="ec-code">Эпизод ${esc(epNo(ep))}</span>${ep.badge ? `<span class="badge">${esc(ep.badge)}</span>` : ''}</div>
+        <h3>${esc(ep.title)}</h3>
+        ${ep.tagline ? `<p class="tagline">${esc(ep.tagline)}</p>` : ''}
+        <p class="ec-sum">${esc(ep.summary)}</p>
+        ${saveSlot(ep)}${caseBadge(ep)}
+        <div class="btns">
+          <a class="btn hot" href="#play-${ep.id}">▶ Играть</a>
+          <a class="btn" href="#ep-${ep.id}">Сцены</a>
+          ${ep.video ? `<a class="btn" href="${ytLink(ep)}" target="_blank" rel="noopener">Запись</a>` : ''}
         </div>
       </div>
     </article>`;
   }
+  function laneHead(ln) {
+    return `<header class="lane-h"><span class="lane-id">${ransom(ln.id, { seed: 'l' + ln.id })}</span><div><b>${esc(ln.name || 'Линия ' + ln.id)}</b>${ln.sub ? `<small>${esc(ln.sub)}</small>` : ''}</div></header>`;
+  }
+  function chronoView(lines) {
+    let prev = null;
+    return `<div class="ev-chrono">${epList().map((e, i) => {
+      const ln = lineOf(e, lines);
+      const sep = !prev || lineOf(prev, lines) !== ln
+        ? `<div class="ev-sep${prev ? '' : ' first'}" style="--lc:${esc(ln.color)}"><span class="ev-sep-t">${prev ? 'Тем временем' : 'Начало'}</span><span class="ev-sep-n">Линия ${esc(ln.id)} · ${esc(ln.name)}${ln.sub ? ` <small>${esc(ln.sub)}</small>` : ''}</span></div>` : '';
+      prev = e;
+      return sep + epItem(e, lines, i === 0 ? 'big' : 'small');
+    }).join('')}</div>`;
+  }
+  function linesView(lines) {
+    return `<div class="ev-lines" style="--lanes:${lines.length}">${lines.map((ln) => {
+      const p = ln.eps[0] && startsAfter(ln.eps[0], lines);
+      return `<section class="ev-lane" style="--lc:${esc(ln.color)}">
+        ${laneHead(ln)}
+        ${p ? `<p class="ev-note">Идёт параллельно с линией ${esc(lineOf(p, lines).id)}. Начинается после эпизода <a href="#ep-${p.id}">${esc(epNo(p))} «${esc(p.title)}»</a>.</p>` : ''}
+        ${ln.eps.length ? ln.eps.map((e, i) => epItem(e, lines, i === 0 ? 'big' : 'small')).join('')
+          : `<div class="ec-soon"><b>Скоро</b><p>${esc(ln.soon || 'Эпизоды этой линии ещё в пути.')}</p></div>`}
+      </section>`;
+    }).join('')}</div>`;
+  }
   function epTree() {
-    const { lines, rows } = treeData();
     if (!epList().length) return '<p class="muted">Пока нет эпизодов.</p>';
-    return `<div class="tree" id="tree" style="--lanes:${lines.length};--rows:${rows}">
-      <svg class="tree-links" id="tree-links" aria-hidden="true"></svg>
-      ${lines.map((ln, i) => `<section class="lane" style="--lc:${esc(ln.color || ['#f2d230', '#22b8cf', '#e8457a', '#7cc46a'][i % 4])};grid-column:${i + 1}">
-        <header class="lane-h"><span class="lane-id">${ransom(ln.id, { seed: 'l' + ln.id })}</span><div><b>${esc(ln.name || 'Линия ' + ln.id)}</b>${ln.sub ? `<small>${esc(ln.sub)}</small>` : ''}</div></header>
-        <div class="lane-body" style="grid-template-rows:repeat(${rows}, auto)">
-          ${ln.eps.map(treeNode).join('')}
-          ${!ln.eps.length ? `<div class="tn tn-soon" style="grid-row:1"><span class="tn-dot" aria-hidden="true"></span><div class="tn-card soon"><b>Скоро</b><p>${esc(ln.soon || 'Эпизоды этой линии ещё в пути.')}</p></div></div>` : ''}
-        </div>
-      </section>`).join('')}
+    const lines = lineList(); const v = epView();
+    const hint = v === 'lines'
+      ? 'Каждая история отдельно — от первого эпизода до последнего.'
+      : 'Обе истории идут в одно время и в одном городе. Здесь эпизоды стоят в порядке событий.';
+    const b = (id, t) => `<button type="button" data-epview="${id}" aria-pressed="${v === id}">${t}</button>`;
+    return `<div class="ev-wrap" id="eps" data-view="${v}">
+      <div class="ev-bar"><div class="ev-switch" role="group" aria-label="Как показать эпизоды">${b('chrono', 'По порядку событий')}${b('lines', 'По линиям')}</div><p class="ev-hint">${hint}</p></div>
+      ${v === 'lines' ? linesView(lines) : chronoView(lines)}
     </div>`;
   }
-  function drawTree() {
-    const tree = document.getElementById('tree'); const svg = document.getElementById('tree-links');
-    if (!tree || !svg) return;
-    const box = tree.getBoundingClientRect();
-    svg.setAttribute('width', box.width); svg.setAttribute('height', box.height);
-    svg.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`);
-    const dot = (id) => { const n = tree.querySelector(`[data-ep="${id}"] .tn-dot`); if (!n) return null; const r = n.getBoundingClientRect(); return { x: r.left + r.width / 2 - box.left, y: r.top + r.height / 2 - box.top, c: getComputedStyle(n).getPropertyValue('--lc') }; };
-    let out = '';
-    epList().forEach((e) => {
-      if (!e._parent) return;
-      const a = dot(e._parent), b = dot(e.id); if (!a || !b) return;
-      const col = (b.c || '#f2d230').trim();
-      const d = Math.abs(a.x - b.x) < 2 ? `M${a.x},${a.y} L${b.x},${b.y}` : `M${a.x},${a.y} C${a.x},${(a.y + b.y) / 2} ${b.x},${(a.y + b.y) / 2} ${b.x},${b.y}`;
-      out += `<path d="${d}" class="tl-bg"/><path d="${d}" class="tl" style="stroke:${col}"/>`;
-    });
-    svg.innerHTML = out;
-  }
-  window.addEventListener('resize', () => requestAnimationFrame(drawTree));
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-epview]'); if (!btn) return;
+    store.set('corpsman:epView', btn.dataset.epview);
+    const box = document.getElementById('eps'); if (box) box.outerHTML = epTree();
+    const nb = document.querySelector(`[data-epview="${btn.dataset.epview}"]`); if (nb) nb.focus({ preventScroll: true });
+  });
 
   function epCard(ep) {
     return `<article class="ep" style="${torn('ep' + ep.id, 1.2, 3, 'tb')}">
@@ -322,43 +333,93 @@
     shell('', `
       <section class="hero">
         <div class="hero-img" style="background-image:url('${esc(banner)}');${torn('hero', 2.2, 2, 'b')}" role="img" aria-label="${esc(S.config.title)}"></div>
-        <div class="clip" style="${torn('clip', 2.5, 4, 'tblr')}">
-          <div class="eyebrow">${esc(S.config.system)}</div>
-          <p>${esc(S.config.intro)}</p>
-          <p class="retell">Визуальная новелла по играм канала <a href="#channel">${esc(S.config.channel)}</a>: сессии можно не только посмотреть, но и пройти самому.</p>
-          <div class="btns">
-            ${ep ? `<a class="btn hot" href="#play-${ep.id}">▶ Играть эпизод ${epNo(ep)}</a>` : ''}
-            <a class="btn ink" href="#characters">Кто есть кто</a>
+        <div class="hero-row">
+          <div class="clip home-start" style="${torn('clip', 2.5, 4, 'tblr')}">
+            <div class="eyebrow">${esc(S.config.system)}</div>
+            <p class="pitch">${esc(S.config.retell || 'Визуальная новелла по играм канала {channel}: сессии можно не только посмотреть, но и пройти самому.').replace('{channel}', `<a href="#channel">${esc(S.config.channel)}</a>`)}</p>
+            <div class="btns">
+              ${ep ? playButton(ep) : ''}
+              <a class="btn ink" href="#characters">Кто есть кто</a>
+            </div>
           </div>
+          ${newsHome()}
         </div>
       </section>
-      ${aboutBlock()}
       <h2>${ransom('Эпизоды')}</h2>
       ${epTree()}
       <h2>${ransom('Персонажи')}</h2>
-      ${charGrid()}`);
+      ${charGrid()}
+      ${aboutHome()}`);
   }
 
-  function aboutBlock() {
-    const a = S.config.about; if (!a) return '';
-    const link = (url, t) => url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(t)}</a>` : esc(t);
+  // Главная кнопка: продолжить с сохранения, иначе следующий непройденный эпизод, иначе начать с первого
+  function playButton(ep) {
+    let p = null; try { p = JSON.parse(store.get('progress:' + ep.id) || 'null'); } catch (e) {}
+    const sc = p && ep.scenes.find((x) => x.id === p.s);
+    const anyDone = epList().some((e) => store.get('done:' + e.id));
+    const label = sc ? `Продолжить: ${epNo(ep)} · сцена ${pad2(ep.scenes.indexOf(sc) + 1)}`
+      : anyDone ? `Следующий эпизод: ${epNo(ep)}` : `Начать с эпизода ${epNo(ep)}`;
+    return `<a class="btn hot" href="#play-${ep.id}" title="${sc ? esc(`«${ep.title}» — ${sc.title}`) : ''}">▶ ${esc(label)}</a>`;
+  }
+
+  // «О проекте» внизу главной: слева лор, автор и музыка, справа история проекта
+  function aboutHome() {
+    const a = S.config.about || {};
     return `<section class="about" id="about">
       <h2>${ransom(a.title || 'О проекте')}</h2>
       <div class="about-grid">
         <div class="about-txt">
+          <div class="eyebrow">${esc(S.config.system)}</div>
+          ${S.config.intro ? `<p class="read">${esc(S.config.intro)}</p>` : ''}
           ${a.lead ? `<p class="read">${esc(a.lead)}</p>` : ''}
-          ${a.text ? `<p class="read">${esc(a.text)}</p>` : ''}
-          ${a.music ? `<p class="music-credit">Музыка для игр — ${link(a.music.url, a.music.name)}${a.music.quote ? `<small>«${esc(a.music.quote)}»</small>` : ''}</p>` : ''}
+          ${a.text ? `<p class="read muted-read">${esc(a.text)}</p>` : ''}
+          ${a.music ? `<p class="music-credit">Музыка в играх — ${extLink(a.music.url, a.music.name)}${a.music.quote ? `<small>«${esc(a.music.quote)}»</small>` : ''}</p>` : ''}
         </div>
-        <ol class="timeline">${(a.timeline || []).map((t, i) => `<li style="${torn('tl' + i, 2.4, 5, 'tblr')};--i:${i}">
-          <span class="tl-when">${esc(t.when || '')}</span>
-          <span class="tl-what">${esc(t.what || '')}</span>
-          <b>${t.url ? link(t.url, '«' + t.title + '»') : esc(t.title)}</b>
-          ${t.text ? `<small>${esc(t.text)}</small>` : ''}
-        </li>`).join('')}</ol>
+        ${timelineBlock()}
       </div>
     </section>`;
   }
+
+  // Внешние ссылки открываются в новой вкладке, ссылки внутри сайта (#…) — в этой же
+  function extLink(url, t) { return url ? `<a href="${esc(url)}"${/^https?:/.test(url) ? ' target="_blank" rel="noopener"' : ''}>${esc(t)}</a>` : esc(t); }
+
+  // История проекта: "about.timeline" в config.json
+  function timelineBlock() {
+    const a = S.config.about || {};
+    if (!(a.timeline || []).length) return '';
+    return `<div class="tl-wrap"><div class="eyebrow">История проекта</div><ol class="timeline">${a.timeline.map((t, i) => `<li style="${torn('tl' + i, 2.4, 5, 'tblr')};--i:${i}">
+          <span class="tl-when">${esc(t.when || '')}</span>
+          <span class="tl-what">${esc(t.what || '')}</span>
+          <b>${extLink(t.url, t.title)}</b>
+          ${t.text ? `<small>${esc(t.text)}</small>` : ''}
+        </li>`).join('')}</ol></div>`;
+  }
+
+  // Новости сайта: "news" в config.json — [{ "date", "title", "text", "link" }], самые свежие сверху.
+  // На главной — первые "newsShow" (по умолчанию 3) коротким списком рядом с кнопкой «Играть», все новости — на странице #news.
+  function newsItem(x) {
+    const inner = `<time>${esc(x.date || '')}</time><p><b>${esc(x.title || '')}</b>${x.text ? `<span>${esc(x.text)}</span>` : ''}</p>`;
+    return `<li>${x.link ? `<a href="${esc(x.link)}"${/^https?:/.test(x.link) ? ' target="_blank" rel="noopener"' : ''}>${inner}<i aria-hidden="true">→</i></a>` : `<div>${inner}</div>`}</li>`;
+  }
+  function newsHome() {
+    const list = S.config.news || []; if (!list.length) return '';
+    const n = S.config.newsShow || 3;
+    const row = (x) => {
+      const inner = `<time>${esc(x.date || '')}</time><b>${esc(x.title || '')}</b>`;
+      return `<li>${x.link ? `<a href="${esc(x.link)}"${/^https?:/.test(x.link) ? ' target="_blank" rel="noopener"' : ''}>${inner}<i aria-hidden="true">→</i></a>` : `<div>${inner}</div>`}</li>`;
+    };
+    return `<aside class="news-box" style="${torn('news', 2.5, 4, 'tblr')}" aria-label="Новости сайта">
+      <div class="eyebrow">${esc(S.config.newsTitle || 'Что нового')}</div>
+      <ul class="news-rows">${list.slice(0, n).map(row).join('')}</ul>
+      <a class="news-all" href="#news">Все новости${list.length > n ? ` (${list.length})` : ''} →</a>
+    </aside>`;
+  }
+  function newsPage() {
+    const list = S.config.news || [];
+    shell('news', `${head('Обновления сайта', S.config.newsTitle || 'Что нового', 'Что появилось на сайте и что изменилось — самые свежие новости сверху.')}
+      <section class="news news-page">${list.length ? `<ul class="news-list">${list.map(newsItem).join('')}</ul>` : '<p class="muted">Пока новостей нет.</p>'}</section>`);
+  }
+
 
   function episodes() { shell('episodes', `${head('Архив', 'Эпизоды', S.config.treeLead || '')}${epTree()}`); }
 
@@ -519,6 +580,7 @@
     if (k === 'channel') return channel();
     if (k === 'music') return musicPage();
     if (k === 'search') return search();
+    if (k === 'news') return newsPage();
     notFound();
   }
   window.addEventListener('hashchange', route);
